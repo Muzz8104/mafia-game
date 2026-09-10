@@ -151,23 +151,25 @@ function processNightResults() {
     announcements.push("Mafia did not strike tonight.");
   }
 
+  // Suicide Bomber mutual elimination check
   if (bomberTarget && bomberTarget !== 'NONE') {
     const bomber = game.players.find(p => p.role === 'Suicide Bomber');
     const bombVictim = game.players.find(p => p.id === bomberTarget);
+    
     if (bomber && bomber.isAlive) {
-      bomber.isAlive = false;
-      announcements.push(`BOOM! Suicide Bomber ${bomber.name} blew up!`);
+      bomber.isAlive = false; // Bomber dies
+      announcements.push(`💥 BOOM! Suicide Bomber ${bomber.name} detonated!`);
     }
     if (bombVictim && bombVictim.isAlive) {
-      bombVictim.isAlive = false;
-      announcements.push(`${bombVictim.name} was caught in the suicide explosion!`);
+      bombVictim.isAlive = false; // Target dies with bomber
+      announcements.push(`💥 ${bombVictim.name} was killed in the suicide explosion!`);
     }
   }
 
   game.nightActions = { mafiaTarget: null, doctorTarget: null, bomberTarget: null };
 
-  // Trigger wake-up vibration for everyone
-  io.emit('vibrateEveryone');
+  // Double Tone + Flash for morning wakeup on EVERYONE'S phone
+  io.emit('triggerAlert', { type: 'CITY_WAKEUP' });
   io.emit('updatePlayers', game.players);
   io.emit('nightResults', announcements);
 
@@ -199,12 +201,14 @@ function runNightStep(step) {
 
   io.emit('nightStepChange', { subPhase: step });
 
-  // Vibrate target role's phone
-  activePlayers.forEach(p => {
-    io.to(p.id).emit('vibrateRole');
-  });
+  // Play appropriate tone on EVERYONE'S phone for step transition
+  if (step === 'MAFIA') {
+    io.emit('triggerAlert', { type: 'MAFIA_TONE' });
+  } else {
+    io.emit('triggerAlert', { type: 'OTHER_ROLE_TONE' });
+  }
 
-  // 2 Minutes (120 seconds) for night actions
+  // 120 seconds for night actions
   startTimer(120, () => advanceNightSequence(step));
 }
 
@@ -228,7 +232,6 @@ function startRound() {
   if (game.currentRound >= 2) {
     game.phase = 'DAY_VOTING';
     io.emit('phaseChange', { phase: 'DAY_VOTING', round: game.currentRound, maxRounds: game.maxRounds });
-    // 2 Minutes (120 seconds) for Day Voting
     startTimer(120, () => processDayVotingResults());
   } else {
     game.phase = 'DISCUSSION';
