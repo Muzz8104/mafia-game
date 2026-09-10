@@ -163,9 +163,7 @@ function processNightResults() {
 
   game.nightActions = { mafiaTarget: null, doctorTarget: null, bomberTarget: null };
 
-  // Step 5: Everyone wakes up — trigger universal vibration
   io.emit('vibrateEveryone');
-
   io.emit('updatePlayers', game.players);
   io.emit('nightResults', announcements);
 
@@ -179,7 +177,6 @@ function processNightResults() {
   }
 }
 
-// Sequential Night Steps
 function startNightPhase() {
   game.phase = 'CITY_SLEEP';
   runNightStep('MAFIA');
@@ -188,19 +185,16 @@ function startNightPhase() {
 function runNightStep(step) {
   game.nightSubPhase = step;
 
-  // Check if active role exists and is alive
   let roleMap = { 'MAFIA': 'Mafia', 'DOCTOR': 'Doctor', 'POLICE': 'Police', 'BOMBER': 'Suicide Bomber' };
   let targetRole = roleMap[step];
   let activePlayers = game.players.filter(p => p.role === targetRole && p.isAlive);
 
   if (activePlayers.length === 0) {
-    // If nobody alive with this role, move directly to next step
     return advanceNightSequence(step);
   }
 
   io.emit('nightStepChange', { subPhase: step });
 
-  // Vibrate target role's phone
   activePlayers.forEach(p => {
     io.to(p.id).emit('vibrateRole');
   });
@@ -242,6 +236,7 @@ io.on('connection', (socket) => {
 
     if (existingPlayer) {
       existingPlayer.id = socket.id;
+      if (name) existingPlayer.name = name;
     } else {
       existingPlayer = {
         id: socket.id,
@@ -268,10 +263,18 @@ io.on('connection', (socket) => {
         role: existingPlayer.role,
         mafiaPartners: existingPlayer.role === 'Mafia' ? mafias.filter(m => m !== existingPlayer.name) : []
       });
-      socket.emit('phaseChange', { phase: game.phase, round: game.currentRound, maxRounds: game.maxRounds });
     }
 
+    socket.emit('phaseChange', { phase: game.phase, round: game.currentRound, maxRounds: game.maxRounds });
     io.emit('updatePlayers', game.players);
+  });
+
+  socket.on('updateName', ({ name }) => {
+    const player = game.players.find(p => p.id === socket.id);
+    if (player && name) {
+      player.name = name;
+      io.emit('updatePlayers', game.players);
+    }
   });
 
   socket.on('startGame', ({ config, rounds }) => {
@@ -307,6 +310,27 @@ io.on('connection', (socket) => {
     });
 
     startRound();
+  });
+
+  socket.on('resetToLobby', () => {
+    if (socket.id !== game.hostId) return;
+
+    stopTimer();
+    game.phase = 'LOBBY';
+    game.currentRound = 0;
+    game.winner = null;
+    game.nightActions = { mafiaTarget: null, doctorTarget: null, bomberTarget: null };
+    game.votes = {};
+
+    game.players.forEach(p => {
+      p.role = null;
+      p.isAlive = true;
+      p.readyForNight = false;
+      p.policeUsed = false;
+    });
+
+    io.emit('phaseChange', { phase: 'LOBBY' });
+    io.emit('updatePlayers', game.players);
   });
 
   socket.on('playerProceed', () => {
