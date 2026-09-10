@@ -9,8 +9,9 @@ const io = new Server(server);
 app.use(express.static('public'));
 
 let game = {
-  players: [], // { id, name, role, isAlive, votesReceived, nightAction }
-  phase: 'LOBBY', // LOBBY, NIGHT, DAY_VOTING, GAME_OVER
+  hostId: null,
+  players: [], // { id, name, role, isAlive, readyForNight }
+  phase: 'LOBBY',
   currentRound: 0,
   maxRounds: 3,
   timer: 0,
@@ -24,7 +25,7 @@ function shuffle(array) {
   return array.sort(() => Math.random() - 0.5);
 }
 
-function startPhaseTimer(seconds, nextPhaseCallback) {
+function startTimer(seconds, onComplete) {
   clearInterval(timerInterval);
   game.timer = seconds;
   io.emit('timerUpdate', game.timer);
@@ -34,59 +35,17 @@ function startPhaseTimer(seconds, nextPhaseCallback) {
     io.emit('timerUpdate', game.timer);
     if (game.timer <= 0) {
       clearInterval(timerInterval);
-      nextPhaseCallback();
+      onComplete();
     }
   }, 1000);
 }
 
-function processNightResults() {
-  let deathLog = [];
-  const { mafiaTarget, doctorTarget, bomberTarget } = game.nightActions;
-
-  // Mafia Kill
-  if (mafiaTarget) {
-    if (mafiaTarget === doctorTarget) {
-      deathLog.push("The Doctor saved someone tonight!");
-    } else {
-      const victim = game.players.find(p => p.id === mafiaTarget);
-      if (victim) {
-        victim.isAlive = false;
-        deathLog.push(`${victim.name} was killed by the Mafia!`);
-      }
-    }
-  }
-
-  // Suicide Bomber Attack
-  if (bomberTarget) {
-    const bomber = game.players.find(p => p.role === 'Suicide Bomber');
-    const bombVictim = game.players.find(p => p.id === bomberTarget);
-    if (bomber && bomber.isAlive) {
-      bomber.isAlive = false;
-      deathLog.push(`BOOM! Suicide Bomber ${bomber.name} blew up!`);
-    }
-    if (bombVictim && bombVictim.isAlive) {
-      bombVictim.isAlive = false;
-      deathLog.push(`${bombVictim.name} was caught in the suicide explosion!`);
-    }
-  }
-
-  // Reset Night Actions
-  game.nightActions = { mafiaTarget: null, doctorTarget: null, bomberTarget: null };
-
-  // Check Game Over or Next Round
-  io.emit('updateState', game);
-  io.emit('announcement', deathLog.join(' ') || "Night passed peacefully. No one died.");
-
-  // Move to Day Discussion / Voting
-  game.phase = 'DAY_VOTING';
-  io.emit('phaseChange', game.phase);
-  startPhaseTimer(45, () => processVotingResults());
-}
-
-function processVotingResults() {
+function processDayVotingResults() {
   let voteCounts = {};
   Object.values(game.votes).forEach(targetId => {
-    voteCounts[targetId] = (voteCounts[targetId] || 0) + 1;
+    if (targetId && targetId !== 'SKIP') {
+      voteCounts[targetId] = (voteCounts[targetId] || 0) + 1;
+    }
   });
 
   let eliminatedId = null;
@@ -98,52 +57,111 @@ function processVotingResults() {
     }
   }
 
+  let voteMsg = "";
   if (eliminatedId) {
     const eliminated = game.players.find(p => p.id === eliminatedId);
     if (eliminated) {
       eliminated.isAlive = false;
-      io.emit('announcement', `Town voted! ${eliminated.name} was eliminated.`);
+      voteMsg = `Town voted! ${eliminated.name} was eliminated.`;
     }
   } else {
-    io.emit('announcement', "No one was eliminated in the vote.");
+    voteMsg = "No one was eliminated in the day vote.";
   }
 
   game.votes = {};
+  io.emit('updatePlayers', game.players);
+  io.emit('nightResults', [voteMsg]);
 
-  // Check Round Limit or End Game
-  if (game.currentRound >= game.maxRounds) {
-    endGame();
+  // Proceed to City Sleep after voting
+  setTimeout(() => startNightPhase(), 4000);
+}
+
+function processNightResults() {
+  let announcements = [];
+  const { mafiaTarget, doctorTarget, bomberTarget } = game.nightActions;
+
+  // Mafia & Doctor
+  if (mafiaTarget) {
+    if (mafiaTarget === doctorTarget) {
+      announcements.push("The person targeted by the Mafia was SAVED by the Doctor!");
+    } else {
+      const victim = game.players.find(p => p.id === mafiaTarget);
+      if (victim) {
+        victim.isAlive = false;
+        announcements.push(`${victim.name} was killed by the Mafia!`);
+      }
+    }
   } else {
-    startNightPhase();
+    announcements.push("Mafia did not strike tonight.");
+  }
+
+  // Suicide Bomber
+  if (bomberTarget && bomberTarget !== 'NONE') {
+    const bomber = game.players.find(p => p.role === 'Suicide Bomber');
+    const bombVictim = game.players.find(p => p.id === bomberTarget);
+    if (bomber && bomber.isAlive) {
+      bomber.isAlive = false;
+      announcements.push(`BOOM! Suicide Bomber ${bomber.name} blew up!`);
+    }
+    if (bombVictim && bombVictim.isAlive) {
+      bombVictim.isAlive = false;
+      announcements.push(`${bombVictim.name} was caught in the suicide explosion!`);
+    }
+  }
+
+  game.nightActions = { mafiaTarget: null, doctorTarget: null, bomberTarget: null };
+
+  io.emit('updatePlayers', game.players);
+  io.emit('nightResults', announcements);
+
+  if (game.currentRound >= game.maxRounds) {
+    game.phase = 'GAME_OVER';
+    io.emit('phaseChange', game.phase);
+    io.emit('revealAllRoles', game.players);
+  } else {
+    setTimeout(() => startRound(), 5000);
   }
 }
 
 function startNightPhase() {
-  game.currentRound++;
-  game.phase = 'NIGHT';
+  game.phase = 'CITY_SLEEP';
   io.emit('phaseChange', game.phase);
-  io.emit('updateState', game);
-  io.emit('announcement', `CITY SLEEP! Close your eyes... (Round ${game.currentRound}/${game.maxRounds})`);
+  io.emit('vibrateRoleActions');
 
-  startPhaseTimer(30, () => processNightResults());
+  startTimer(30, () => processNightResults());
 }
 
-function endGame() {
-  game.phase = 'GAME_OVER';
-  io.emit('phaseChange', game.phase);
-  io.emit('revealRoles', game.players);
-  io.emit('announcement', "GAME OVER! All roles have been revealed below.");
+function startRound() {
+  game.currentRound++;
+  game.players.forEach(p => p.readyForNight = false);
+
+  if (game.currentRound >= 2) {
+    game.phase = 'DAY_VOTING';
+    io.emit('phaseChange', { phase: 'DAY_VOTING', round: game.currentRound, maxRounds: game.maxRounds });
+    startTimer(30, () => processDayVotingResults());
+  } else {
+    game.phase = 'DISCUSSION';
+    io.emit('phaseChange', { phase: 'DISCUSSION', round: game.currentRound, maxRounds: game.maxRounds });
+  }
 }
 
 io.on('connection', (socket) => {
+  if (!game.hostId) {
+    game.hostId = socket.id;
+  }
+
   socket.on('joinGame', ({ name }) => {
     if (!game.players.find(p => p.id === socket.id)) {
-      game.players.push({ id: socket.id, name, role: null, isAlive: true });
+      game.players.push({ id: socket.id, name, role: null, isAlive: true, readyForNight: false });
     }
-    io.emit('updateState', game);
+    const isHost = socket.id === game.hostId;
+    socket.emit('initPlayer', { isHost });
+    io.emit('updatePlayers', game.players);
   });
 
-  socket.on('setupAndStartGame', ({ config, rounds }) => {
+  socket.on('startGame', ({ config, rounds }) => {
+    if (socket.id !== game.hostId) return;
+
     game.maxRounds = parseInt(rounds) || 3;
     game.currentRound = 0;
 
@@ -158,13 +176,44 @@ io.on('connection', (socket) => {
     game.players.forEach((player, index) => {
       player.role = roleDeck[index] || 'Common Man';
       player.isAlive = true;
-      io.to(player.id).emit('assignRole', player.role);
+      player.readyForNight = false;
     });
 
-    startNightPhase();
+    const mafias = game.players.filter(p => p.role === 'Mafia').map(p => p.name);
+
+    game.players.forEach(p => {
+      io.to(p.id).emit('assignRole', {
+        role: p.role,
+        mafiaPartners: p.role === 'Mafia' ? mafias.filter(m => m !== p.name) : []
+      });
+    });
+
+    startRound();
   });
 
-  socket.on('nightAction', ({ targetId }) => {
+  socket.on('playerProceed', () => {
+    const player = game.players.find(p => p.id === socket.id);
+    if (player) {
+      player.readyForNight = true;
+      io.emit('updatePlayers', game.players);
+
+      const alivePlayers = game.players.filter(p => p.isAlive);
+      const readyCount = alivePlayers.filter(p => p.readyForNight).length;
+
+      if (readyCount >= alivePlayers.length) {
+        startNightPhase();
+      }
+    }
+  });
+
+  socket.on('submitDayVote', ({ targetId }) => {
+    const player = game.players.find(p => p.id === socket.id);
+    if (player && player.isAlive) {
+      game.votes[socket.id] = targetId;
+    }
+  });
+
+  socket.on('submitNightAction', ({ targetId }) => {
     const player = game.players.find(p => p.id === socket.id);
     if (!player || !player.isAlive) return;
 
@@ -173,16 +222,13 @@ io.on('connection', (socket) => {
     if (player.role === 'Suicide Bomber') game.nightActions.bomberTarget = targetId;
   });
 
-  socket.on('castVote', ({ targetId }) => {
-    const player = game.players.find(p => p.id === socket.id);
-    if (player && player.isAlive) {
-      game.votes[socket.id] = targetId;
-    }
-  });
-
   socket.on('disconnect', () => {
     game.players = game.players.filter(p => p.id !== socket.id);
-    io.emit('updateState', game);
+    if (socket.id === game.hostId && game.players.length > 0) {
+      game.hostId = game.players[0].id;
+      io.to(game.hostId).emit('initPlayer', { isHost: true });
+    }
+    io.emit('updatePlayers', game.players);
   });
 });
 
