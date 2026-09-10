@@ -108,16 +108,6 @@
     body.night-mode { background: #020617; }
     body.night-mode .card { background: #0f172a; border-color: #1e293b; }
 
-    .tally-item {
-      background: #0f172a;
-      padding: 10px 14px;
-      margin: 6px 0;
-      border-radius: 8px;
-      display: flex;
-      justify-content: space-between;
-      border-left: 4px solid var(--accent-amber);
-    }
-
     .player-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -143,20 +133,19 @@
 </head>
 <body>
 
-  <!-- Hidden HTML5 Audio Element For Wakeup Cue -->
-  <audio id="audio-wakeup" preload="auto" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFb3B1eX2CgoSGiIqMjY6PkJGSk5SVlp2en6CipKaqqqurrLCwtLW3uLu8vb7AwMTGxsfIycnLy8vMzc7Oz9DR0tPU1dbX2NnZ2tvb3N3e3+/w8fLz9PX29/j5+vv8/f7/"></audio>
-
   <div class="container">
     <div class="game-logo">🕵️ MAFIA NIGHT</div>
     <div id="host-badge" style="color: var(--accent-green); font-size: 13px; font-weight: 600;"></div>
     
     <div style="margin: 8px 0;">
-      <button class="btn-blue btn-small" onclick="testAudioCue()">🔊 Test Wakeup Cue</button>
-      <span id="audio-status" style="font-size: 12px; color: var(--accent-amber); margin-left: 8px;">Tap screen to enable audio</span>
+      <button class="btn-blue btn-small" onclick="testAudioCue()">🔊 Test Audio Engine</button>
+      <span id="audio-status" style="font-size: 12px; color: var(--accent-amber); margin-left: 8px;">Tap screen to enable sound</span>
     </div>
 
+    <!-- Night Results Banner -->
+    <div id="results-banner" style="color: var(--accent-amber); font-size: 16px; font-weight: 600; margin: 10px 0; background: #1e293b; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);"></div>
+
     <div id="timer"></div>
-    <div id="results-banner" style="color: var(--accent-amber); font-size: 16px; font-weight: 600; margin: 10px 0;"></div>
 
     <!-- Join/Name Setup -->
     <div id="join-sec" class="card">
@@ -230,7 +219,6 @@
       socket.emit('joinGame', { name: savedName, token: playerToken });
     }
 
-    // Silent unlocking for mobile browser audio policy
     document.body.addEventListener('touchstart', unlockAudio, { once: false });
     document.body.addEventListener('click', unlockAudio, { once: false });
 
@@ -242,60 +230,250 @@
       if (audioCtx && audioCtx.state === 'suspended') {
         audioCtx.resume();
       }
-      
-      const el = document.getElementById('audio-wakeup');
-      if (el) {
-        el.play().then(() => {
-          el.pause();
-          el.currentTime = 0;
-        }).catch(e => {});
-      }
-
-      document.getElementById('audio-status').innerText = '🔊 Wakeup Cue Ready';
+      document.getElementById('audio-status').innerText = '🔊 Audio Enabled';
       document.getElementById('audio-status').style.color = 'var(--accent-green)';
     }
 
-    // Single function reserved EXCLUSIVELY for morning wakeup cue
-    function playWakeupCue() {
+    // --- Web Audio Synthesizers ---
+    
+    function playSleepBeep() {
       unlockAudio();
-      try {
-        if (audioCtx && audioCtx.state === 'running') {
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(350, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 1.2);
+    }
+
+    function playGunSound() {
+      unlockAudio();
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      
+      // Cocking metallic sound
+      const cock = audioCtx.createOscillator();
+      const cockGain = audioCtx.createGain();
+      cock.type = 'triangle';
+      cock.frequency.setValueAtTime(1200, audioCtx.currentTime);
+      cock.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+      cockGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      cockGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+      cock.connect(cockGain);
+      cockGain.connect(audioCtx.destination);
+      cock.start();
+      cock.stop(audioCtx.currentTime + 0.1);
+
+      // Gunshot Burst (Noise) after cocking
+      setTimeout(() => {
+        const bufferSize = audioCtx.sampleRate * 0.4;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1000, audioCtx.currentTime);
+        filter.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        noise.start();
+      }, 150);
+    }
+
+    function playECGSound() {
+      unlockAudio();
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      
+      // 3 ECG Heartbeats over 3 Seconds
+      const beats = [0, 1.0, 2.0];
+      beats.forEach(delay => {
+        setTimeout(() => {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(1174.66, audioCtx.currentTime + 0.4);
+          osc.frequency.setValueAtTime(950, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.18);
+        }, delay * 1000);
+      });
+    }
 
-          gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+    function playPoliceSiren() {
+      unlockAudio();
+      if (!audioCtx || audioCtx.state !== 'running') return;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+
+      const now = audioCtx.currentTime;
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.linearRampToValueAtTime(1200, now + 0.5);
+      osc.frequency.linearRampToValueAtTime(600, now + 1.0);
+      osc.frequency.linearRampToValueAtTime(1200, now + 1.5);
+
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 1.8);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + 1.8);
+    }
+
+    function playExplosionSound() {
+      unlockAudio();
+      if (!audioCtx || audioCtx.state !== 'running') return;
+
+      // Fuse ticking
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          const tick = audioCtx.createOscillator();
+          const tickGain = audioCtx.createGain();
+          tick.type = 'square';
+          tick.frequency.setValueAtTime(800, audioCtx.currentTime);
+          tickGain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          tickGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+          tick.connect(tickGain);
+          tickGain.connect(audioCtx.destination);
+          tick.start();
+          tick.stop(audioCtx.currentTime + 0.05);
+        }, i * 150);
+      }
+
+      // Explosion rumble
+      setTimeout(() => {
+        const bufferSize = audioCtx.sampleRate * 0.8;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(300, audioCtx.currentTime);
+        filter.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.7);
+
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.75);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        noise.start();
+      }, 500);
+    }
+
+    function playBirdChirpAndWakeup() {
+      unlockAudio();
+      if (!audioCtx || audioCtx.state !== 'running') return;
+
+      // Realistic Bird Chirps
+      const chirpTimes = [0, 0.2, 0.4, 0.7, 0.9];
+      chirpTimes.forEach((delay) => {
+        setTimeout(() => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          const now = audioCtx.currentTime;
+          osc.frequency.setValueAtTime(2000 + Math.random() * 500, now);
+          osc.frequency.exponentialRampToValueAtTime(3200 + Math.random() * 400, now + 0.08);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
           osc.connect(gain);
           gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        }, delay * 1000);
+      });
 
-          osc.start();
-          osc.stop(audioCtx.currentTime + 0.5);
-          return;
-        }
-      } catch (e) {}
+      // City Wakeup Chime
+      setTimeout(() => {
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+        gain1.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start();
+        osc1.stop(audioCtx.currentTime + 0.8);
 
-      const audioEl = document.getElementById('audio-wakeup');
-      if (audioEl) {
-        audioEl.currentTime = 0;
-        audioEl.play().catch(e => {});
-      }
+        setTimeout(() => {
+          const osc2 = audioCtx.createOscillator();
+          const gain2 = audioCtx.createGain();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(659.25, audioCtx.currentTime); // E5
+          gain2.gain.setValueAtTime(0.5, audioCtx.currentTime);
+          gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
+          osc2.connect(gain2);
+          gain2.connect(audioCtx.destination);
+          osc2.start();
+          osc2.stop(audioCtx.currentTime + 1.2);
+        }, 400);
+      }, 1000);
     }
 
     function testAudioCue() {
-      playWakeupCue();
+      playGunSound();
+      setTimeout(playECGSound, 600);
+      setTimeout(playPoliceSiren, 3800);
+      setTimeout(playExplosionSound, 5800);
+      setTimeout(playBirdChirpAndWakeup, 7000);
+
       if ("vibrate" in navigator) {
         try { navigator.vibrate([100, 50, 100]); } catch(e){}
       }
     }
 
-    // Strictly trigger visual and audio wake-up ONLY when night ends
     socket.on('triggerAlert', (data) => {
-      if (data.type === 'CITY_WAKEUP') {
-        playWakeupCue();
+      if (data.type === 'SLEEP_BEEP') {
+        playSleepBeep();
+        if ("vibrate" in navigator) try { navigator.vibrate(800); } catch(e){}
+      } else if (data.type === 'MAFIA_GUN') {
+        playGunSound();
+        if ("vibrate" in navigator) try { navigator.vibrate(300); } catch(e){}
+      } else if (data.type === 'DOCTOR_ECG') {
+        playECGSound();
+        if ("vibrate" in navigator) try { navigator.vibrate(100); } catch(e){}
+      } else if (data.type === 'POLICE_SIREN') {
+        playPoliceSiren();
+        if ("vibrate" in navigator) try { navigator.vibrate(400); } catch(e){}
+      } else if (data.type === 'BOMBER_EXPLODE') {
+        playExplosionSound();
+        if ("vibrate" in navigator) try { navigator.vibrate([200, 100, 400]); } catch(e){}
+      } else if (data.type === 'CITY_WAKEUP') {
+        playBirdChirpAndWakeup();
         if ("vibrate" in navigator) try { navigator.vibrate([600, 200, 600]); } catch(e){}
         
         document.body.classList.add('flash-screen');
@@ -366,7 +544,6 @@
 
     socket.on('phaseChange', (data) => {
       currentPhase = data.phase;
-      document.getElementById('results-banner').innerText = '';
       document.getElementById('voting-summary-sec').classList.add('hidden');
       document.getElementById('host-restart-area').classList.add('hidden');
       document.getElementById('host-restart-area').innerHTML = '';
@@ -376,6 +553,7 @@
 
       if (data.phase === 'LOBBY') {
         document.body.classList.remove('night-mode');
+        document.getElementById('results-banner').innerText = '';
         document.getElementById('join-sec').classList.remove('hidden');
         document.getElementById('game-sec').classList.add('hidden');
         document.getElementById('my-role').innerText = '???';
