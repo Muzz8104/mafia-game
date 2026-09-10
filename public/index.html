@@ -1,60 +1,234 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mafia Game</title>
+  <title>🕵️ Mafia Night - Online Game</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; padding: 15px; }
-    .card { background: #1e1e1e; padding: 15px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; }
-    input, button, select { width: 90%; padding: 12px; margin: 6px; font-size: 16px; border-radius: 5px; }
-    button { background: #e50914; color: white; border: none; font-weight: bold; cursor: pointer; }
-    .btn-green { background: #2ed573; }
-    .hidden { display: none; }
-    #timer { font-size: 32px; color: #ff9f43; font-weight: bold; margin: 10px 0; }
-    .partner { color: #ff4757; font-weight: bold; }
-    .alive { color: #2ed573; }
-    .dead { color: #ff4757; text-decoration: line-through; }
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent-red: #ef4444;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-blue: #3b82f6;
+      --text-main: #f8fafc;
+      --border-color: #334155;
+    }
+
+    * { box-sizing: border-box; transition: all 0.3s ease; }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: var(--bg-color);
+      color: var(--text-main);
+      text-align: center;
+      padding: 15px;
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    .container { max-width: 500px; margin: 0 auto; }
+
+    /* Header & Branding */
+    .game-logo {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 10px 0 5px 0;
+      background: linear-gradient(45deg, #ef4444, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: pulseLogo 2s infinite alternate;
+    }
+
+    @keyframes pulseLogo {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.03); }
+    }
+
+    /* Card Styling */
+    .card {
+      background: var(--card-bg);
+      padding: 18px;
+      margin: 12px 0;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      animation: fadeIn 0.4s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Form Controls & Inputs */
+    input, select {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: #0f172a;
+      color: var(--text-main);
+      font-size: 15px;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+    }
+
+    /* Buttons */
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 8px;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    }
+
+    button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5); }
+    button:active { transform: translateY(0); }
+    button:disabled { background: #475569; cursor: not-allowed; box-shadow: none; transform: none; }
+
+    .btn-green {
+      background: linear-gradient(135deg, #10b981, #059669);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    .btn-green:hover { box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5); }
+
+    /* Timer */
+    #timer {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--accent-amber);
+      margin: 5px 0;
+      letter-spacing: 1px;
+    }
+
+    /* Badges & Role Box */
+    .role-badge {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+      color: white;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Dynamic Phase Themes */
+    body.night-mode {
+      background: #020617;
+    }
+    body.night-mode .card {
+      background: #0f172a;
+      border-color: #1e293b;
+    }
+
+    /* Voting Breakdown List */
+    .tally-item {
+      background: #0f172a;
+      padding: 10px 14px;
+      margin: 6px 0;
+      border-radius: 8px;
+      font-size: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-left: 4px solid var(--accent-amber);
+    }
+
+    /* Player Roster UI */
+    .player-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 10px;
+      padding: 0;
+      list-style: none;
+      margin-top: 10px;
+    }
+
+    .player-card {
+      background: #0f172a;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      border: 1px solid var(--border-color);
+    }
+
+    .player-card.alive { border-color: var(--accent-green); }
+    .player-card.dead { opacity: 0.5; border-color: var(--accent-red); text-decoration: line-through; }
+
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
-  <h1>🕵️ Mafia Game</h1>
-  <div id="host-badge" style="color: #2ed573; font-weight: bold;"></div>
-  <div id="timer"></div>
-  <div id="results-banner" style="color:#00d2d3; font-size:18px; font-weight:bold;"></div>
+  <div class="container">
+    <div class="game-logo">🕵️ MAFIA NIGHT</div>
+    <div id="host-badge" style="color: var(--accent-green); font-size: 13px; font-weight: 600;"></div>
+    <div id="timer"></div>
+    <div id="results-banner" style="color: var(--accent-amber); font-size: 16px; font-weight: 600; margin: 10px 0;"></div>
 
-  <!-- Step 1: Join Room -->
-  <div id="join-sec" class="card">
-    <h3>Enter Name to Join</h3>
-    <input type="text" id="username" placeholder="Your Name">
-    <button onclick="join()">Join Game</button>
-  </div>
-
-  <!-- Host Configuration -->
-  <div id="host-sec" class="card hidden">
-    <h3>⚙️ Admin Game Settings</h3>
-    <label>Mafia Count: <input type="number" id="cfg-mafia" value="1" min="1"></label><br>
-    <label>Doctor Count: <input type="number" id="cfg-doctor" value="1" min="0"></label><br>
-    <label>Suicide Bomber Count: <input type="number" id="cfg-bomber" value="1" min="0"></label><br>
-    <label>Common Man Count: <input type="number" id="cfg-common" value="2" min="1"></label><br>
-    <label>Total Rounds: <input type="number" id="cfg-rounds" value="3" min="1"></label><br>
-    <button onclick="startGame()">Start Game for Everyone</button>
-  </div>
-
-  <!-- Player Status Display -->
-  <div id="game-sec" class="card hidden">
-    <h3>Your Role: <span id="my-role" style="color:#ff4757;">???</span></h3>
-    <div id="mafia-partners-box" class="hidden">
-      <p>Mafia Teammates: <span id="mafia-partners" class="partner">None</span></p>
+    <!-- Step 1: Join Game -->
+    <div id="join-sec" class="card">
+      <h3 style="margin-top: 0;">👋 Welcome to the Game</h3>
+      <input type="text" id="username" placeholder="Enter Your Nickname">
+      <button onclick="join()">Join Game Room</button>
     </div>
-    <h2 id="phase-title">Waiting for Admin to start...</h2>
-    <div id="action-area"></div>
-  </div>
 
-  <!-- Live Player Roster -->
-  <div class="card">
-    <h3>Players List</h3>
-    <ul id="player-list" style="list-style:none; padding:0;"></ul>
+    <!-- Host Admin Settings -->
+    <div id="host-sec" class="card hidden">
+      <h3 style="margin-top: 0; color: var(--accent-amber);">⚙️ Admin Panel</h3>
+      <div style="text-align: left; font-size: 14px;">
+        <label>Mafia Count: <input type="number" id="cfg-mafia" value="1" min="1"></label>
+        <label>Doctor Count: <input type="number" id="cfg-doctor" value="1" min="0"></label>
+        <label>Police Count: <input type="number" id="cfg-police" value="1" min="0"></label>
+        <label>Suicide Bomber Count: <input type="number" id="cfg-bomber" value="1" min="0"></label>
+        <label>Common Man Count: <input type="number" id="cfg-common" value="2" min="1"></label>
+        <label>Total Game Rounds: <input type="number" id="cfg-rounds" value="5" min="1"></label>
+      </div>
+      <button class="btn-green" onclick="startGame()">🚀 Start Game for Everyone</button>
+    </div>
+
+    <!-- Game Active Section -->
+    <div id="game-sec" class="card hidden">
+      <p style="margin: 0 0 5px 0; font-size: 13px; color: #94a3b8;">YOUR ASSIGNED ROLE</p>
+      <div id="my-role" class="role-badge">???</div>
+      
+      <div id="mafia-partners-box" class="hidden" style="margin-top: 10px; font-size: 13px;">
+        <p style="margin:0; color: var(--accent-red);">👥 Mafia Partners: <span id="mafia-partners" style="font-weight: bold;">None</span></p>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 15px 0;">
+      
+      <h2 id="phase-title" style="margin: 5px 0; font-size: 20px;">Waiting for Host...</h2>
+      <div id="action-area"></div>
+    </div>
+
+    <!-- Day Voting Breakdown Window -->
+    <div id="voting-summary-sec" class="card hidden" style="border: 1px solid var(--accent-amber);">
+      <h3 style="color: var(--accent-amber); margin-top: 0;">📊 Voting Results Tally</h3>
+      <div id="vote-breakdown-list"></div>
+    </div>
+
+    <!-- Active Roster Card -->
+    <div class="card">
+      <h3 style="margin-top: 0; font-size: 16px;">👥 Live Players</h3>
+      <div id="player-list" class="player-grid"></div>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -62,22 +236,40 @@
     const socket = io();
     let isHost = false;
     let myRole = '';
+    let policeUsed = false;
     let allPlayers = [];
+
+    // Persist login token
+    let playerToken = localStorage.getItem('mafia_token');
+    if (!playerToken) {
+      playerToken = 'token_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('mafia_token', playerToken);
+    }
+
+    const savedName = localStorage.getItem('mafia_username');
+    if (savedName) {
+      document.getElementById('username').value = savedName;
+      socket.emit('joinGame', { name: savedName, token: playerToken });
+    }
 
     function join() {
       const name = document.getElementById('username').value;
       if (name) {
-        socket.emit('joinGame', { name });
-        document.getElementById('join-sec').classList.add('hidden');
-        document.getElementById('game-sec').classList.remove('hidden');
+        localStorage.setItem('mafia_username', name);
+        socket.emit('joinGame', { name, token: playerToken });
       }
     }
 
     socket.on('initPlayer', (data) => {
       isHost = data.isHost;
+      document.getElementById('join-sec').classList.add('hidden');
+      document.getElementById('game-sec').classList.remove('hidden');
+
       if (isHost) {
-        document.getElementById('host-badge').innerText = '👑 You are the Admin Host';
-        document.getElementById('host-sec').classList.remove('hidden');
+        document.getElementById('host-badge').innerText = '👑 You are the Room Host';
+        if (data.currentPhase === 'LOBBY') {
+          document.getElementById('host-sec').classList.remove('hidden');
+        }
       } else {
         document.getElementById('host-badge').innerText = '';
         document.getElementById('host-sec').classList.add('hidden');
@@ -88,6 +280,7 @@
       const config = {
         mafia: parseInt(document.getElementById('cfg-mafia').value),
         doctor: parseInt(document.getElementById('cfg-doctor').value),
+        police: parseInt(document.getElementById('cfg-police').value),
         bomber: parseInt(document.getElementById('cfg-bomber').value),
         common: parseInt(document.getElementById('cfg-common').value)
       };
@@ -113,30 +306,35 @@
 
     socket.on('phaseChange', (data) => {
       document.getElementById('results-banner').innerText = '';
+      document.getElementById('voting-summary-sec').classList.add('hidden');
       const area = document.getElementById('action-area');
       area.innerHTML = '';
 
       if (data.phase === 'DISCUSSION') {
-        document.getElementById('phase-title').innerText = `🗣️ Round ${data.round}/${data.maxRounds}: Discussion Time`;
+        document.body.classList.remove('night-mode');
+        document.getElementById('phase-title').innerText = `🗣️ Discussion Round (${data.round}/${data.maxRounds})`;
         area.innerHTML = `
-          <p>Discuss with everyone! Click when ready for City Sleep.</p>
-          <button id="proceed-btn" class="btn-green" onclick="clickProceed()">Ready for City Sleep</button>
+          <p style="font-size:14px; color:#94a3b8;">Discuss suspicious moves! Press when ready to proceed.</p>
+          <button id="proceed-btn" class="btn-green" onclick="clickProceed()">Ready for Night Phase</button>
         `;
       } else if (data.phase === 'DAY_VOTING') {
-        document.getElementById('phase-title').innerText = `🗳️ Round ${data.round}/${data.maxRounds}: Day Voting Time`;
-        area.innerHTML = `<p>Vote to eliminate a player (including Mafias):</p>` + renderDayVotingSelect();
-      } else if (data === 'CITY_SLEEP') {
-        document.getElementById('phase-title').innerText = '🌙 CITY SLEEP! Close Your Eyes';
+        document.body.classList.remove('night-mode');
+        document.getElementById('phase-title').innerText = `🗳️ Day Vote (${data.round}/${data.maxRounds})`;
+        area.innerHTML = `<p style="font-size:14px; color:#94a3b8;">Select a player to vote out:</p>` + renderDayVotingSelect();
+      } else if (data.phase === 'CITY_SLEEP') {
+        document.body.classList.add('night-mode');
+        document.getElementById('phase-title').innerText = '🌙 City Sleep Phase';
         renderNightActionControls();
-      } else if (data === 'GAME_OVER') {
-        document.getElementById('phase-title').innerText = '🏆 GAME OVER!';
+      } else if (data.phase === 'GAME_OVER') {
+        document.body.classList.remove('night-mode');
+        document.getElementById('phase-title').innerText = data.winnerMessage || '🏆 GAME OVER!';
       }
     });
 
     function clickProceed() {
       socket.emit('playerProceed');
       document.getElementById('proceed-btn').disabled = true;
-      document.getElementById('proceed-btn').innerText = '✅ Waiting for other players...';
+      document.getElementById('proceed-btn').innerText = '✅ Waiting for others...';
     }
 
     function renderDayVotingSelect() {
@@ -145,18 +343,41 @@
       targets.forEach(t => {
         html += `<option value="${t.id}">${t.name}</option>`;
       });
-      html += '</select><button onclick="submitDayVote()">Cast Vote</button>';
+      html += '</select><button onclick="submitDayVote()">Submit Vote</button>';
       return html;
     }
 
     function submitDayVote() {
       const targetId = document.getElementById('day-vote-target').value;
       socket.emit('submitDayVote', { targetId });
-      document.getElementById('action-area').innerHTML = '<p>✅ Vote cast! Waiting for countdown...</p>';
+      document.getElementById('action-area').innerHTML = '<p style="color:var(--accent-green);">✅ Vote registered! Waiting for results...</p>';
     }
 
+    socket.on('dayVotingDetails', (data) => {
+      const voteSec = document.getElementById('voting-summary-sec');
+      const voteList = document.getElementById('vote-breakdown-list');
+
+      let html = '';
+      if (data.voteTallies.length === 0) {
+        html = '<p>No votes cast.</p>';
+      } else {
+        data.voteTallies.forEach(t => {
+          html += `
+            <div class="tally-item">
+              <span>👤 <strong>${t.name}</strong></span>
+              <span style="color:var(--accent-amber); font-weight:bold;">${t.count} vote(s)</span>
+            </div>`;
+        });
+      }
+      
+      voteList.innerHTML = html;
+      voteSec.classList.remove('hidden');
+
+      document.getElementById('results-banner').innerHTML = data.verdict;
+    });
+
     socket.on('vibrateRoleActions', () => {
-      if (['Mafia', 'Doctor', 'Suicide Bomber'].includes(myRole) && "vibrate" in navigator) {
+      if (['Mafia', 'Doctor', 'Police', 'Suicide Bomber'].includes(myRole) && "vibrate" in navigator) {
         navigator.vibrate([500, 200, 500]);
       }
     });
@@ -166,21 +387,28 @@
       const activeTargets = allPlayers.filter(p => p.isAlive && p.id !== socket.id);
 
       if (myRole === 'Mafia') {
-        area.innerHTML = `<h3>👀 Open Eyes (Mafia)</h3><p>Select target to kill:</p>` + 
-          buildSelectHtml(activeTargets, false) + `<button onclick="submitAction()">OK</button>`;
+        area.innerHTML = `<h3>🗡️ Mafia Action</h3><p style="font-size:14px; color:#94a3b8;">Select victim to eliminate:</p>` + 
+          buildSelectHtml(activeTargets, 'night-target', false) + `<button onclick="submitAction()">Confirm Elimination</button>`;
       } else if (myRole === 'Doctor') {
-        area.innerHTML = `<h3>👀 Open Eyes (Doctor)</h3><p>Select target to save:</p>` + 
-          buildSelectHtml(allPlayers.filter(p => p.isAlive), false) + `<button onclick="submitAction()">OK</button>`;
+        area.innerHTML = `<h3>💉 Doctor Action</h3><p style="font-size:14px; color:#94a3b8;">Select player to save tonight:</p>` + 
+          buildSelectHtml(allPlayers.filter(p => p.isAlive), 'night-target', false) + `<button onclick="submitAction()">Confirm Protection</button>`;
+      } else if (myRole === 'Police') {
+        if (!policeUsed) {
+          area.innerHTML = `<h3>🔍 Police Investigation</h3><p style="font-size:14px; color:#94a3b8;">Select target to investigate:</p>` + 
+            buildSelectHtml(activeTargets, 'police-target', false) + `<button onclick="submitPolice()">Investigate Target</button>`;
+        } else {
+          area.innerHTML = `<p style="color:#94a3b8;">🚔 You have already used your investigation ability!</p>`;
+        }
       } else if (myRole === 'Suicide Bomber') {
-        area.innerHTML = `<h3>👀 Open Eyes (Suicide Bomber)</h3><p>Select target to bomb (or select No One):</p>` + 
-          buildSelectHtml(activeTargets, true) + `<button onclick="submitAction()">OK</button>`;
+        area.innerHTML = `<h3>💣 Suicide Bomber</h3><p style="font-size:14px; color:#94a3b8;">Choose target to explode with:</p>` + 
+          buildSelectHtml(activeTargets, 'night-target', true) + `<button onclick="submitAction()">Confirm Target</button>`;
       } else {
-        area.innerHTML = `<p>😴 Keep your eyes closed...</p>`;
+        area.innerHTML = `<p style="color:#94a3b8;">😴 You are a Common Man. Sleep peacefully...</p>`;
       }
     }
 
-    function buildSelectHtml(targets, allowNone) {
-      let html = '<select id="night-target">';
+    function buildSelectHtml(targets, selectId, allowNone) {
+      let html = `<select id="${selectId}">`;
       if (allowNone) html += '<option value="NONE">-- Select No One --</option>';
       targets.forEach(t => {
         html += `<option value="${t.id}">${t.name}</option>`;
@@ -192,8 +420,18 @@
     function submitAction() {
       const targetId = document.getElementById('night-target').value;
       socket.emit('submitNightAction', { targetId });
-      document.getElementById('action-area').innerHTML = '<p>✅ Action submitted! Close your eyes...</p>';
+      document.getElementById('action-area').innerHTML = '<p style="color:var(--accent-green);">✅ Target submitted. Close your eyes...</p>';
     }
+
+    function submitPolice() {
+      const targetId = document.getElementById('police-target').value;
+      socket.emit('submitPoliceAction', { targetId });
+    }
+
+    socket.on('policeResult', (data) => {
+      policeUsed = true;
+      document.getElementById('action-area').innerHTML = `<p style="color:var(--accent-amber); font-size:16px;">🔍 <strong>Result:</strong> ${data.targetName} is <strong>${data.role}</strong>!</p>`;
+    });
 
     socket.on('nightResults', (announcements) => {
       document.getElementById('results-banner').innerHTML = announcements.join('<br>');
@@ -212,12 +450,12 @@
       const list = document.getElementById('player-list');
       list.innerHTML = '';
       players.forEach(p => {
-        const li = document.createElement('li');
-        li.className = p.isAlive ? 'alive' : 'dead';
-        const readyStatus = p.readyForNight && p.isAlive ? ' [Ready]' : '';
-        const roleLabel = (revealRoles || p.id === socket.id) && p.role ? ` (${p.role})` : '';
-        li.innerText = `${p.name}${roleLabel} - ${p.isAlive ? 'Alive' : 'Dead'}${readyStatus}`;
-        list.appendChild(li);
+        const div = document.createElement('div');
+        div.className = `player-card ${p.isAlive ? 'alive' : 'dead'}`;
+        const readyStatus = p.readyForNight && p.isAlive ? ' <span style="color:var(--accent-green)">✓</span>' : '';
+        const roleLabel = (revealRoles || p.id === socket.id) && p.role ? `<br><small style="color:var(--accent-amber);">${p.role}</small>` : '';
+        div.innerHTML = `<strong>${p.name}</strong>${readyStatus}${roleLabel}`;
+        list.appendChild(div);
       });
     }
   </script>
