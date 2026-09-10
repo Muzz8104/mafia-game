@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mafia - Admin Host</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #1a1a2e; color: #e94560; }
+    ul { list-style-type: none; padding: 0; }
+    li { background: #16213e; margin: 5px 0; padding: 10px; border-radius: 5px; color: white; }
+    button { padding: 15px; background: #0f3460; color: white; border: none; font-size: 18px; width: 100%; }
+  </style>
+</head>
+<body>
+  <h1>Admin Dashboard</h1>
+  <h3>Players Joined:</h3>
+  <ul id="player-list"></ul>
+
+  <button onclick="startGame()">Assign Roles & Start Night 1</button>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    socket.on('updatePlayers', (players) => {
+      const list = document.getElementById('player-list');
+      list.innerHTML = '';
+      players.forEach(p => {
+        const li = document.createElement('li');
+        li.innerText = p.name + (p.isAlive ? " (Alive)" : " (Dead)");
+        list.appendChild(li);
+      });
+    });
+
+    function startGame() {
+      // Customize role deck based on total players
+      const roles = ['Mafia', 'Doctor', 'Suicide Bomber', 'Common Man', 'Common Man'];
+      socket.emit('startGame', roles);
+    }
+  </script>
+</body>
+</html>

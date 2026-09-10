@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mafia - Player</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: white; }
+    input, button { padding: 12px; font-size: 16px; margin: 10px; width: 80%; }
+    .card { background: #222; padding: 20px; border-radius: 10px; margin-top: 20px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <div id="join-sec">
+    <h2>Join Mafia Game</h2>
+    <input type="text" id="username" placeholder="Enter Your Name">
+    <button onclick="join()">Join Room</button>
+  </div>
+
+  <div id="game-sec" class="hidden">
+    <h3 id="player-welcome"></h3>
+    <div class="card">
+      <p>Your Role:</p>
+      <h1 id="role-display" style="color: #ff4757;">???</h1>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    function join() {
+      const name = document.getElementById('username').value;
+      if (name) {
+        socket.emit('joinGame', { name });
+        document.getElementById('join-sec').classList.add('hidden');
+        document.getElementById('game-sec').classList.remove('hidden');
+        document.getElementById('player-welcome').innerText = "Player: " + name;
+      }
+    }
+
+    socket.on('assignRole', (role) => {
+      document.getElementById('role-display').innerText = role;
+    });
+  </script>
+</body>
+</html>
