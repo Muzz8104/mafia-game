@@ -255,6 +255,17 @@
       }
     }
 
+    // Helper for device vibration with fallback
+    function triggerDeviceVibration(pattern) {
+      if ("vibrate" in navigator) {
+        try {
+          navigator.vibrate(pattern);
+        } catch (e) {
+          console.log("Vibration error or blocked by browser policy:", e);
+        }
+      }
+    }
+
     socket.on('initPlayer', (data) => {
       isHost = data.isHost;
 
@@ -289,6 +300,7 @@
 
     socket.on('assignRole', (data) => {
       myRole = data.role;
+      policeUsed = false;
       document.getElementById('my-role').innerText = myRole;
 
       if (myRole === 'Mafia' && data.mafiaPartners.length > 0) {
@@ -345,7 +357,6 @@
         document.body.classList.remove('night-mode');
         document.getElementById('phase-title').innerText = data.winnerMessage || '🏆 GAME OVER!';
         
-        // Show Name Editing section again so users can rename before next game
         document.getElementById('join-sec').classList.remove('hidden');
 
         if (isHost) {
@@ -362,16 +373,14 @@
       renderNightStepAction(data.subPhase);
     });
 
+    // Role-specific wake-up vibration (Strong triple vibration)
     socket.on('vibrateRole', () => {
-      if ("vibrate" in navigator) {
-        navigator.vibrate([600, 200, 600]);
-      }
+      triggerDeviceVibration([800, 300, 800, 300, 800]);
     });
 
+    // Morning wake-up vibration for everyone (Long distinct vibration pattern)
     socket.on('vibrateEveryone', () => {
-      if ("vibrate" in navigator) {
-        navigator.vibrate([400, 150, 400, 150, 400]);
-      }
+      triggerDeviceVibration([1000, 200, 1000, 200, 1000]);
     });
 
     function clickProceed() {
