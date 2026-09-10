@@ -101,6 +101,11 @@
       box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
     }
 
+    .btn-blue {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
     #timer {
       font-size: 36px;
       font-weight: 700;
@@ -167,11 +172,11 @@
     <div id="timer"></div>
     <div id="results-banner" style="color: var(--accent-amber); font-size: 16px; font-weight: 600; margin: 10px 0;"></div>
 
-    <!-- Step 1: Join Game -->
+    <!-- Step 1: Join / Edit Name Card -->
     <div id="join-sec" class="card">
-      <h3 style="margin-top: 0;">👋 Welcome to the Game</h3>
+      <h3 style="margin-top: 0;">👤 Your Player Profile</h3>
       <input type="text" id="username" placeholder="Enter Your Nickname">
-      <button onclick="join()">Join Game Room</button>
+      <button id="save-name-btn" onclick="saveName()">Save / Update Name</button>
     </div>
 
     <!-- Host Admin Settings -->
@@ -201,6 +206,7 @@
       
       <h2 id="phase-title" style="margin: 5px 0; font-size: 20px;">Waiting for Host...</h2>
       <div id="action-area"></div>
+      <div id="host-restart-area" class="hidden" style="margin-top: 15px;"></div>
     </div>
 
     <!-- Day Voting Breakdown Window -->
@@ -223,6 +229,7 @@
     let myRole = '';
     let policeUsed = false;
     let allPlayers = [];
+    let currentPhase = 'LOBBY';
 
     let playerToken = localStorage.getItem('mafia_token');
     if (!playerToken) {
@@ -236,22 +243,24 @@
       socket.emit('joinGame', { name: savedName, token: playerToken });
     }
 
-    function join() {
-      const name = document.getElementById('username').value;
+    function saveName() {
+      const name = document.getElementById('username').value.trim();
       if (name) {
         localStorage.setItem('mafia_username', name);
-        socket.emit('joinGame', { name, token: playerToken });
+        socket.emit('updateName', { name });
+        document.getElementById('save-name-btn').innerText = '✅ Name Updated';
+        setTimeout(() => {
+          document.getElementById('save-name-btn').innerText = 'Save / Update Name';
+        }, 2000);
       }
     }
 
     socket.on('initPlayer', (data) => {
       isHost = data.isHost;
-      document.getElementById('join-sec').classList.add('hidden');
-      document.getElementById('game-sec').classList.remove('hidden');
 
       if (isHost) {
         document.getElementById('host-badge').innerText = '👑 You are the Room Host';
-        if (data.currentPhase === 'LOBBY') {
+        if (currentPhase === 'LOBBY') {
           document.getElementById('host-sec').classList.remove('hidden');
         }
       } else {
@@ -274,6 +283,10 @@
       document.getElementById('host-sec').classList.add('hidden');
     }
 
+    function resetGame() {
+      socket.emit('resetToLobby');
+    }
+
     socket.on('assignRole', (data) => {
       myRole = data.role;
       document.getElementById('my-role').innerText = myRole;
@@ -289,10 +302,30 @@
     });
 
     socket.on('phaseChange', (data) => {
+      currentPhase = data.phase;
       document.getElementById('results-banner').innerText = '';
       document.getElementById('voting-summary-sec').classList.add('hidden');
+      document.getElementById('host-restart-area').classList.add('hidden');
+      document.getElementById('host-restart-area').innerHTML = '';
+      
       const area = document.getElementById('action-area');
       area.innerHTML = '';
+
+      if (data.phase === 'LOBBY') {
+        document.body.classList.remove('night-mode');
+        document.getElementById('join-sec').classList.remove('hidden');
+        document.getElementById('game-sec').classList.add('hidden');
+        document.getElementById('my-role').innerText = '???';
+        document.getElementById('mafia-partners-box').classList.add('hidden');
+
+        if (isHost) {
+          document.getElementById('host-sec').classList.remove('hidden');
+        }
+      } else {
+        document.getElementById('join-sec').classList.add('hidden');
+        document.getElementById('game-sec').classList.remove('hidden');
+        document.getElementById('host-sec').classList.add('hidden');
+      }
 
       if (data.phase === 'DISCUSSION') {
         document.body.classList.remove('night-mode');
@@ -311,24 +344,30 @@
       } else if (data.phase === 'GAME_OVER') {
         document.body.classList.remove('night-mode');
         document.getElementById('phase-title').innerText = data.winnerMessage || '🏆 GAME OVER!';
+        
+        // Show Name Editing section again so users can rename before next game
+        document.getElementById('join-sec').classList.remove('hidden');
+
+        if (isHost) {
+          const restartArea = document.getElementById('host-restart-area');
+          restartArea.innerHTML = `<button class="btn-blue" onclick="resetGame()">🔄 Play Again / New Game</button>`;
+          restartArea.classList.remove('hidden');
+        }
       }
     });
 
-    // Sequential Night Steps Execution
     socket.on('nightStepChange', (data) => {
       document.body.classList.add('night-mode');
       document.getElementById('phase-title').innerText = '🌙 City Sleep Phase';
       renderNightStepAction(data.subPhase);
     });
 
-    // Role-specific phone vibration
     socket.on('vibrateRole', () => {
       if ("vibrate" in navigator) {
         navigator.vibrate([600, 200, 600]);
       }
     });
 
-    // Universal wake-up phone vibration
     socket.on('vibrateEveryone', () => {
       if ("vibrate" in navigator) {
         navigator.vibrate([400, 150, 400, 150, 400]);
