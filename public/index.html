@@ -29,7 +29,6 @@
       min-height: 100vh;
     }
 
-    /* Screen Flash Visual Alert */
     body.flash-screen {
       animation: flashBg 0.4s iteration-count 3;
     }
@@ -117,6 +116,14 @@
       box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
     }
 
+    .btn-small {
+      padding: 8px 12px;
+      font-size: 13px;
+      margin-top: 5px;
+      width: auto;
+      display: inline-block;
+    }
+
     #timer {
       font-size: 36px;
       font-weight: 700;
@@ -177,17 +184,23 @@
 </head>
 <body>
 
+  <!-- Audio Elements for Fail-Safe Fallback -->
+  <audio id="audio-mafia" preload="auto" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFb3B1eX2CgoSGiIqMjY6PkJGSk5SVlp2en6CipKaqqqurrLCwtLW3uLu8vb7AwMTGxsfIycnLy8vMzc7Oz9DR0tPU1dbX2NnZ2tvb3N3e3+/w8fLz9PX29/j5+vv8/f7/"></audio>
+  <audio id="audio-role" preload="auto" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFb3B1eX2CgoSGiIqMjY6PkJGSk5SVlp2en6CipKaqqqurrLCwtLW3uLu8vb7AwMTGxsfIycnLy8vMzc7Oz9DR0tPU1dbX2NnZ2tvb3N3e3+/w8fLz9PX29/j5+vv8/f7/"></audio>
+  <audio id="audio-wakeup" preload="auto" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFb3B1eX2CgoSGiIqMjY6PkJGSk5SVlp2en6CipKaqqqurrLCwtLW3uLu8vb7AwMTGxsfIycnLy8vMzc7Oz9DR0tPU1dbX2NnZ2tvb3N3e3+/w8fLz9PX29/j5+vv8/f7/"></audio>
+
   <div class="container">
     <div class="game-logo">🕵️ MAFIA NIGHT</div>
     <div id="host-badge" style="color: var(--accent-green); font-size: 13px; font-weight: 600;"></div>
+    
+    <!-- Sound Status & Test Header Bar -->
+    <div style="margin: 8px 0;">
+      <button class="btn-blue btn-small" onclick="testAudioCue()">🔊 Test Sound Cue</button>
+      <span id="audio-status" style="font-size: 12px; color: var(--accent-amber); margin-left: 8px;">Tap button to enable audio</span>
+    </div>
+
     <div id="timer"></div>
     <div id="results-banner" style="color: var(--accent-amber); font-size: 16px; font-weight: 600; margin: 10px 0;"></div>
-
-    <!-- Enable Sound & Vibration Permissions -->
-    <div id="audio-unlock-card" class="card" style="border: 1px solid var(--accent-amber);">
-      <p style="margin: 0 0 8px 0; font-size: 13px; color: var(--accent-amber);">🔊 <strong>Enable Wake-Up Sound Tones</strong></p>
-      <button class="btn-blue" onclick="unlockAudioAndVibration()">🔔 Tap Here to Enable Tones</button>
-    </div>
 
     <!-- Step 1: Join / Edit Name Card -->
     <div id="join-sec" class="card">
@@ -248,6 +261,7 @@
     let allPlayers = [];
     let currentPhase = 'LOBBY';
     let audioCtx = null;
+    let isAudioUnlocked = false;
 
     let playerToken = localStorage.getItem('mafia_token');
     if (!playerToken) {
@@ -261,7 +275,101 @@
       socket.emit('joinGame', { name: savedName, token: playerToken });
     }
 
+    // Attach global listener so ANY tap on screen unlocks iOS audio context
+    document.body.addEventListener('touchstart', unlockAudio, { once: false });
+    document.body.addEventListener('click', unlockAudio, { once: false });
+
+    function unlockAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) audioCtx = new AudioContext();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      
+      // Warm up HTML5 audio tags
+      ['audio-mafia', 'audio-role', 'audio-wakeup'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.play().then(() => {
+            el.pause();
+            el.currentTime = 0;
+          }).catch(e => {});
+        }
+      });
+
+      isAudioUnlocked = true;
+      document.getElementById('audio-status').innerText = '🔊 Audio Enabled';
+      document.getElementById('audio-status').style.color = 'var(--accent-green)';
+    }
+
+    function playAudioTone(freq, duration = 0.4) {
+      unlockAudio();
+
+      // Primary: Web Audio API Oscillator
+      try {
+        if (audioCtx && audioCtx.state === 'running') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+          gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.start();
+          osc.stop(audioCtx.currentTime + duration);
+          return;
+        }
+      } catch (e) {
+        console.log("Web Audio error, trying fallback:", e);
+      }
+
+      // Fallback: HTML5 Audio Elements
+      let audioId = 'audio-role';
+      if (freq <= 500) audioId = 'audio-mafia';
+      if (freq >= 800) audioId = 'audio-wakeup';
+
+      const audioEl = document.getElementById(audioId);
+      if (audioEl) {
+        audioEl.currentTime = 0;
+        audioEl.play().catch(e => console.log("Audio play blocked:", e));
+      }
+    }
+
+    function testAudioCue() {
+      unlockAudio();
+      playAudioTone(587.33, 0.4);
+      if ("vibrate" in navigator) {
+        try { navigator.vibrate([100, 50, 100]); } catch(e){}
+      }
+    }
+
+    socket.on('triggerAlert', (data) => {
+      if (data.type === 'MAFIA_TONE') {
+        playAudioTone(440, 0.5);
+        if ("vibrate" in navigator) try { navigator.vibrate(400); } catch(e){}
+      } else if (data.type === 'OTHER_ROLE_TONE') {
+        playAudioTone(587.33, 0.5);
+        if ("vibrate" in navigator) try { navigator.vibrate(400); } catch(e){}
+      } else if (data.type === 'CITY_WAKEUP') {
+        playAudioTone(880, 0.3);
+        setTimeout(() => playAudioTone(1174.66, 0.5), 350);
+        
+        if ("vibrate" in navigator) try { navigator.vibrate([600, 200, 600]); } catch(e){}
+        
+        document.body.classList.add('flash-screen');
+        setTimeout(() => document.body.classList.remove('flash-screen'), 1200);
+      }
+    });
+
     function saveName() {
+      unlockAudio();
       const name = document.getElementById('username').value.trim();
       if (name) {
         localStorage.setItem('mafia_username', name);
@@ -272,74 +380,6 @@
         }, 2000);
       }
     }
-
-    function unlockAudioAndVibration() {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        audioCtx = new AudioContext();
-        audioCtx.resume();
-      }
-
-      playAudioTone(440, 0.2);
-
-      if ("vibrate" in navigator) {
-        navigator.vibrate([100, 50, 100]);
-      }
-
-      document.getElementById('audio-unlock-card').classList.add('hidden');
-    }
-
-    function playAudioTone(freq, duration = 0.4) {
-      try {
-        if (!audioCtx) {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          if (AudioContext) audioCtx = new AudioContext();
-        }
-        if (audioCtx && audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
-
-        if (audioCtx) {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-
-          gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-
-          osc.start();
-          osc.stop(audioCtx.currentTime + duration);
-        }
-      } catch (e) {
-        console.log("Audio play error:", e);
-      }
-    }
-
-    socket.on('triggerAlert', (data) => {
-      if (data.type === 'MAFIA_TONE') {
-        // Single Tone for Mafia on everyone's phone
-        playAudioTone(440, 0.5);
-        if ("vibrate" in navigator) try { navigator.vibrate(400); } catch(e){}
-      } else if (data.type === 'OTHER_ROLE_TONE') {
-        // Single Tone for Doctor / Police / Bomber on everyone's phone
-        playAudioTone(587.33, 0.5);
-        if ("vibrate" in navigator) try { navigator.vibrate(400); } catch(e){}
-      } else if (data.type === 'CITY_WAKEUP') {
-        // Double Tone for City Wakeup on everyone's phone
-        playAudioTone(880, 0.3);
-        setTimeout(() => playAudioTone(1174.66, 0.5), 350);
-        
-        if ("vibrate" in navigator) try { navigator.vibrate([600, 200, 600]); } catch(e){}
-        
-        document.body.classList.add('flash-screen');
-        setTimeout(() => document.body.classList.remove('flash-screen'), 1200);
-      }
-    });
 
     socket.on('initPlayer', (data) => {
       isHost = data.isHost;
@@ -356,6 +396,7 @@
     });
 
     function startGame() {
+      unlockAudio();
       const config = {
         mafia: parseInt(document.getElementById('cfg-mafia').value),
         doctor: parseInt(document.getElementById('cfg-doctor').value),
@@ -370,6 +411,7 @@
     }
 
     function resetGame() {
+      unlockAudio();
       socket.emit('resetToLobby');
     }
 
@@ -449,6 +491,7 @@
     });
 
     function clickProceed() {
+      unlockAudio();
       socket.emit('playerProceed');
       document.getElementById('proceed-btn').disabled = true;
       document.getElementById('proceed-btn').innerText = '✅ Waiting for others...';
@@ -465,6 +508,7 @@
     }
 
     function submitDayVote() {
+      unlockAudio();
       const targetId = document.getElementById('day-vote-target').value;
       socket.emit('submitDayVote', { targetId });
       document.getElementById('action-area').innerHTML = '<p style="color:var(--accent-green);">✅ Vote registered! Waiting for results...</p>';
@@ -549,12 +593,14 @@
     }
 
     function submitAction() {
+      unlockAudio();
       const targetId = document.getElementById('night-target').value;
       socket.emit('submitNightAction', { targetId });
       document.getElementById('action-area').innerHTML = '<p style="color:var(--accent-green);">✅ Target submitted. Close your eyes...</p>';
     }
 
     function submitPolice() {
+      unlockAudio();
       const targetId = document.getElementById('police-target').value;
       socket.emit('submitPoliceAction', { targetId });
     }
