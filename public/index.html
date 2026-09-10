@@ -2,59 +2,64 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Automated Mafia Game</title>
+  <title>Mafia Game</title>
   <style>
-    body { font-family: Arial, sans-serif; background: #121212; color: #fff; text-align: center; padding: 15px; }
+    body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; padding: 15px; }
     .card { background: #1e1e1e; padding: 15px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; }
-    input, button, select { width: 90%; padding: 10px; margin: 5px; font-size: 16px; border-radius: 5px; }
+    input, button, select { width: 90%; padding: 12px; margin: 6px; font-size: 16px; border-radius: 5px; }
     button { background: #e50914; color: white; border: none; font-weight: bold; cursor: pointer; }
+    .btn-green { background: #2ed573; }
     .hidden { display: none; }
+    #timer { font-size: 32px; color: #ff9f43; font-weight: bold; margin: 10px 0; }
+    .partner { color: #ff4757; font-weight: bold; }
     .alive { color: #2ed573; }
     .dead { color: #ff4757; text-decoration: line-through; }
-    #timer { font-size: 28px; color: #ffa500; font-weight: bold; }
   </style>
 </head>
 <body>
 
   <h1>🕵️ Mafia Game</h1>
-  <div id="announcement" style="color:#00d2d3; font-weight:bold; margin:10px 0;"></div>
   <div id="timer"></div>
+  <div id="results-banner" style="color:#00d2d3; font-size:18px; font-weight:bold;"></div>
 
   <!-- Step 1: Join Room -->
   <div id="join-sec" class="card">
-    <h3>Join Game</h3>
-    <input type="text" id="username" placeholder="Enter Your Name">
-    <button onclick="join()">Join as Player</button>
+    <h3>Enter Name to Join</h3>
+    <input type="text" id="username" placeholder="Your Name">
+    <button onclick="join()">Join Game</button>
   </div>
 
-  <!-- Step 2: Role Config (Visible before start) -->
-  <div id="setup-sec" class="card hidden">
-    <h3>Game Setup (Optional Config)</h3>
-    <label>Mafia: <input type="number" id="cfg-mafia" value="1" min="1"></label><br>
-    <label>Doctor: <input type="number" id="cfg-doctor" value="1" min="0"></label><br>
-    <label>Suicide Bomber: <input type="number" id="cfg-bomber" value="1" min="0"></label><br>
-    <label>Common Man: <input type="number" id="cfg-common" value="2" min="1"></label><br>
+  <!-- Host Configuration -->
+  <div id="host-sec" class="card hidden">
+    <h3>⚙️ Host Game Settings</h3>
+    <label>Mafia Count: <input type="number" id="cfg-mafia" value="1" min="1"></label><br>
+    <label>Doctor Count: <input type="number" id="cfg-doctor" value="1" min="0"></label><br>
+    <label>Suicide Bomber Count: <input type="number" id="cfg-bomber" value="1" min="0"></label><br>
+    <label>Common Man Count: <input type="number" id="cfg-common" value="2" min="1"></label><br>
     <label>Total Rounds: <input type="number" id="cfg-rounds" value="3" min="1"></label><br>
     <button onclick="startGame()">Start Game for Everyone</button>
   </div>
 
-  <!-- Game Main Screen -->
+  <!-- Player Status Display -->
   <div id="game-sec" class="card hidden">
-    <p>Your Role: <strong id="my-role" style="color:#ff4757;">???</strong></p>
-    <h3 id="phase-title">Waiting...</h3>
+    <h3>Your Role: <span id="my-role" style="color:#ff4757;">???</span></h3>
+    <div id="mafia-partners-box" class="hidden">
+      <p>Mafia Teammates: <span id="mafia-partners" class="partner">None</span></p>
+    </div>
+    <h2 id="phase-title">Waiting to start...</h2>
     <div id="action-area"></div>
   </div>
 
-  <!-- Live Player Roster / Final End Game Reveal -->
+  <!-- Live Player Roster -->
   <div class="card">
-    <h3>Players & End Game Roles</h3>
+    <h3>Players List</h3>
     <ul id="player-list" style="list-style:none; padding:0;"></ul>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-    let myId = '';
+    let isHost = false;
     let myRole = '';
     let allPlayers = [];
 
@@ -62,12 +67,17 @@
       const name = document.getElementById('username').value;
       if (name) {
         socket.emit('joinGame', { name });
-        myId = socket.id;
         document.getElementById('join-sec').classList.add('hidden');
-        document.getElementById('setup-sec').classList.remove('hidden');
         document.getElementById('game-sec').classList.remove('hidden');
       }
     }
+
+    socket.on('initPlayer', (data) => {
+      isHost = data.isHost;
+      if (isHost) {
+        document.getElementById('host-sec').classList.remove('hidden');
+      }
+    });
 
     function startGame() {
       const config = {
@@ -77,91 +87,131 @@
         common: parseInt(document.getElementById('cfg-common').value)
       };
       const rounds = document.getElementById('cfg-rounds').value;
-      socket.emit('setupAndStartGame', { config, rounds });
-      document.getElementById('setup-sec').classList.add('hidden');
+
+      socket.emit('startGame', { config, rounds });
+      document.getElementById('host-sec').classList.add('hidden');
     }
 
-    socket.on('assignRole', (role) => {
-      myRole = role;
-      document.getElementById('my-role').innerText = role;
-    });
+    socket.on('assignRole', (data) => {
+      myRole = data.role;
+      document.getElementById('my-role').innerText = myRole;
 
-    socket.on('timerUpdate', (time) => {
-      document.getElementById('timer').innerText = time > 0 ? "Time Remaining: " + time + "s" : "";
-    });
-
-    socket.on('announcement', (msg) => {
-      document.getElementById('announcement').innerText = msg;
-    });
-
-    socket.on('updateState', (game) => {
-      allPlayers = game.players;
-      renderPlayerList(allPlayers, false);
-    });
-
-    socket.on('phaseChange', (phase) => {
-      const area = document.getElementById('action-area');
-      area.innerHTML = '';
-
-      if (phase === 'NIGHT') {
-        document.getElementById('phase-title').innerText = "🌙 CITY SLEEP! Night Phase";
-        if (['Mafia', 'Doctor', 'Suicide Bomber'].includes(myRole)) {
-          area.innerHTML = `<p>Select your target:</p>` + renderPlayerSelect();
-        } else {
-          area.innerHTML = `<p>Close your eyes. Common men are sleeping...</p>`;
-        }
-      } else if (phase === 'DAY_VOTING') {
-        document.getElementById('phase-title').innerText = "☀️ CITY OPEN! Day Discussion & Voting";
-        area.innerHTML = `<p>Vote to eliminate a suspect:</p>` + renderVoteSelect();
-      } else if (phase === 'GAME_OVER') {
-        document.getElementById('phase-title').innerText = "🏆 GAME OVER!";
-        area.innerHTML = `<p>Check all player roles below!</p>`;
+      if (myRole === 'Mafia' && data.mafiaPartners.length > 0) {
+        document.getElementById('mafia-partners-box').classList.remove('hidden');
+        document.getElementById('mafia-partners').innerText = data.mafiaPartners.join(', ');
       }
     });
 
-    socket.on('revealRoles', (players) => {
-      renderPlayerList(players, true);
+    socket.on('timerUpdate', (t) => {
+      document.getElementById('timer').innerText = t > 0 ? "⏱️ " + t + "s" : "";
     });
 
-    function renderPlayerSelect() {
-      let html = '<select id="target-select">';
-      allPlayers.filter(p => p.isAlive).forEach(p => {
-        html += `<option value="${p.id}">${p.name}</option>`;
+    socket.on('phaseChange', (data) => {
+      document.getElementById('results-banner').innerText = '';
+      const area = document.getElementById('action-area');
+      area.innerHTML = '';
+
+      if (data.phase === 'DISCUSSION') {
+        document.getElementById('phase-title').innerText = `🗣️ Round ${data.round}/${data.maxRounds}: Discussion Time`;
+        area.innerHTML = `
+          <p>Discuss with everyone! Click when ready for City Sleep.</p>
+          <button id="proceed-btn" class="btn-green" onclick="clickProceed()">Ready for City Sleep</button>
+        `;
+      } else if (data.phase === 'DAY_VOTING') {
+        document.getElementById('phase-title').innerText = `🗳️ Round ${data.round}/${data.maxRounds}: Day Voting Time`;
+        area.innerHTML = `<p>Vote to eliminate a player (including Mafias):</p>` + renderDayVotingSelect();
+      } else if (data === 'CITY_SLEEP') {
+        document.getElementById('phase-title').innerText = '🌙 CITY SLEEP! Close Your Eyes';
+        renderNightActionControls();
+      } else if (data === 'GAME_OVER') {
+        document.getElementById('phase-title').innerText = '🏆 GAME OVER!';
+      }
+    });
+
+    function clickProceed() {
+      socket.emit('playerProceed');
+      document.getElementById('proceed-btn').disabled = true;
+      document.getElementById('proceed-btn').innerText = '✅ Waiting for other players...';
+    }
+
+    function renderDayVotingSelect() {
+      const targets = allPlayers.filter(p => p.isAlive && p.id !== socket.id);
+      let html = '<select id="day-vote-target"><option value="SKIP">-- Skip Vote --</option>';
+      targets.forEach(t => {
+        html += `<option value="${t.id}">${t.name}</option>`;
       });
-      html += '</select><button onclick="submitAction()">Submit Night Target</button>';
+      html += '</select><button onclick="submitDayVote()">Cast Vote</button>';
       return html;
     }
 
-    function renderVoteSelect() {
-      let html = '<select id="vote-select">';
-      allPlayers.filter(p => p.isAlive).forEach(p => {
-        html += `<option value="${p.id}">${p.name}</option>`;
+    function submitDayVote() {
+      const targetId = document.getElementById('day-vote-target').value;
+      socket.emit('submitDayVote', { targetId });
+      document.getElementById('action-area').innerHTML = '<p>✅ Vote cast! Waiting for countdown...</p>';
+    }
+
+    socket.on('vibrateRoleActions', () => {
+      if (['Mafia', 'Doctor', 'Suicide Bomber'].includes(myRole) && "vibrate" in navigator) {
+        navigator.vibrate([500, 200, 500]);
+      }
+    });
+
+    function renderNightActionControls() {
+      const area = document.getElementById('action-area');
+      const activeTargets = allPlayers.filter(p => p.isAlive && p.id !== socket.id);
+
+      if (myRole === 'Mafia') {
+        area.innerHTML = `<h3>👀 Open Eyes (Mafia)</h3><p>Select target to kill:</p>` + 
+          buildSelectHtml(activeTargets, false) + `<button onclick="submitAction()">OK</button>`;
+      } else if (myRole === 'Doctor') {
+        area.innerHTML = `<h3>👀 Open Eyes (Doctor)</h3><p>Select target to save:</p>` + 
+          buildSelectHtml(allPlayers.filter(p => p.isAlive), false) + `<button onclick="submitAction()">OK</button>`;
+      } else if (myRole === 'Suicide Bomber') {
+        area.innerHTML = `<h3>👀 Open Eyes (Suicide Bomber)</h3><p>Select target to bomb (or select No One):</p>` + 
+          buildSelectHtml(activeTargets, true) + `<button onclick="submitAction()">OK</button>`;
+      } else {
+        area.innerHTML = `<p>😴 Keep your eyes closed...</p>`;
+      }
+    }
+
+    function buildSelectHtml(targets, allowNone) {
+      let html = '<select id="night-target">';
+      if (allowNone) html += '<option value="NONE">-- Select No One --</option>';
+      targets.forEach(t => {
+        html += `<option value="${t.id}">${t.name}</option>`;
       });
-      html += '</select><button onclick="submitVote()">Cast Vote</button>';
+      html += '</select>';
       return html;
     }
 
     function submitAction() {
-      const targetId = document.getElementById('target-select').value;
-      socket.emit('nightAction', { targetId });
-      document.getElementById('action-area').innerHTML = '<p>Target submitted! Wait for night to end...</p>';
+      const targetId = document.getElementById('night-target').value;
+      socket.emit('submitNightAction', { targetId });
+      document.getElementById('action-area').innerHTML = '<p>✅ Action submitted! Close your eyes...</p>';
     }
 
-    function submitVote() {
-      const targetId = document.getElementById('vote-select').value;
-      socket.emit('castVote', { targetId });
-      document.getElementById('action-area').innerHTML = '<p>Vote cast! Waiting for countdown...</p>';
-    }
+    socket.on('nightResults', (announcements) => {
+      document.getElementById('results-banner').innerHTML = announcements.join('<br>');
+    });
 
-    function renderPlayerList(players, revealAll = false) {
+    socket.on('updatePlayers', (players) => {
+      allPlayers = players;
+      renderPlayerList(players, false);
+    });
+
+    socket.on('revealAllRoles', (players) => {
+      renderPlayerList(players, true);
+    });
+
+    function renderPlayerList(players, revealRoles) {
       const list = document.getElementById('player-list');
       list.innerHTML = '';
       players.forEach(p => {
         const li = document.createElement('li');
-        const statusClass = p.isAlive ? 'alive' : 'dead';
-        const roleText = (revealAll || p.id === socket.id) && p.role ? ` [${p.role}]` : '';
-        li.className = statusClass;
-        li.innerText = `${p.name}${roleText} - ${p.isAlive ? 'Alive' : 'Dead'}`;
+        li.className = p.isAlive ? 'alive' : 'dead';
+        const readyStatus = p.readyForNight && p.isAlive ? ' [Ready]' : '';
+        const roleLabel = (revealRoles || p.id === socket.id) && p.role ? ` (${p.role})` : '';
+        li.innerText = `${p.name}${roleLabel} - ${p.isAlive ? 'Alive' : 'Dead'}${readyStatus}`;
         list.appendChild(li);
       });
     }
