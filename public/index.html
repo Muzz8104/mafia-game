@@ -48,12 +48,6 @@
       background: linear-gradient(45deg, #ef4444, #f59e0b);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      animation: pulseLogo 2s infinite alternate;
-    }
-
-    @keyframes pulseLogo {
-      0% { transform: scale(1); }
-      100% { transform: scale(1.03); }
     }
 
     .card {
@@ -63,12 +57,6 @@
       border-radius: 12px;
       border: 1px solid var(--border-color);
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-      animation: fadeIn 0.4s ease-in-out;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
     }
 
     input, select {
@@ -83,11 +71,6 @@
       outline: none;
     }
 
-    input:focus, select:focus {
-      border-color: var(--accent-blue);
-      box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
-    }
-
     button {
       width: 100%;
       padding: 14px;
@@ -99,37 +82,17 @@
       cursor: pointer;
       background: linear-gradient(135deg, #ef4444, #dc2626);
       color: white;
-      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
     }
 
-    button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5); }
-    button:active { transform: translateY(0); }
-    button:disabled { background: #475569; cursor: not-allowed; box-shadow: none; transform: none; }
-
-    .btn-green {
-      background: linear-gradient(135deg, #10b981, #059669);
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-    }
-
-    .btn-blue {
-      background: linear-gradient(135deg, #3b82f6, #2563eb);
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    }
-
-    .btn-small {
-      padding: 8px 12px;
-      font-size: 13px;
-      margin-top: 5px;
-      width: auto;
-      display: inline-block;
-    }
+    .btn-green { background: linear-gradient(135deg, #10b981, #059669); }
+    .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .btn-small { padding: 8px 12px; font-size: 13px; margin-top: 5px; width: auto; display: inline-block; }
 
     #timer {
       font-size: 36px;
       font-weight: 700;
       color: var(--accent-amber);
       margin: 5px 0;
-      letter-spacing: 1px;
     }
 
     .role-badge {
@@ -140,8 +103,6 @@
       background: linear-gradient(135deg, #ef4444, #b91c1c);
       color: white;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
     }
 
     body.night-mode { background: #020617; }
@@ -152,10 +113,8 @@
       padding: 10px 14px;
       margin: 6px 0;
       border-radius: 8px;
-      font-size: 15px;
       display: flex;
       justify-content: space-between;
-      align-items: center;
       border-left: 4px solid var(--accent-amber);
     }
 
@@ -184,32 +143,29 @@
 </head>
 <body>
 
-  <!-- Audio Elements for Fail-Safe Fallback -->
-  <audio id="audio-mafia" preload="auto" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFb3B1eX2CgoSGiIqMjY6PkJGSk5SVlp2en6CipKaqqqurrLCwtLW3uLu8vb7AwMTGxsfIycnLy8vMzc7Oz9DR0tPU1dbX2NnZ2tvb3N3e3+/w8fLz9PX29/j5+vv8/f7/"></audio>
-  <audio id="audio-role" preload="auto" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFb3B1eX2CgoSGiIqMjY6PkJGSk5SVlp2en6CipKaqqqurrLCwtLW3uLu8vb7AwMTGxsfIycnLy8vMzc7Oz9DR0tPU1dbX2NnZ2tvb3N3e3+/w8fLz9PX29/j5+vv8/f7/"></audio>
+  <!-- Hidden HTML5 Audio Element For Wakeup Cue -->
   <audio id="audio-wakeup" preload="auto" src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFb3B1eX2CgoSGiIqMjY6PkJGSk5SVlp2en6CipKaqqqurrLCwtLW3uLu8vb7AwMTGxsfIycnLy8vMzc7Oz9DR0tPU1dbX2NnZ2tvb3N3e3+/w8fLz9PX29/j5+vv8/f7/"></audio>
 
   <div class="container">
     <div class="game-logo">🕵️ MAFIA NIGHT</div>
     <div id="host-badge" style="color: var(--accent-green); font-size: 13px; font-weight: 600;"></div>
     
-    <!-- Sound Status & Test Header Bar -->
     <div style="margin: 8px 0;">
-      <button class="btn-blue btn-small" onclick="testAudioCue()">🔊 Test Sound Cue</button>
-      <span id="audio-status" style="font-size: 12px; color: var(--accent-amber); margin-left: 8px;">Tap button to enable audio</span>
+      <button class="btn-blue btn-small" onclick="testAudioCue()">🔊 Test Wakeup Cue</button>
+      <span id="audio-status" style="font-size: 12px; color: var(--accent-amber); margin-left: 8px;">Tap screen to enable audio</span>
     </div>
 
     <div id="timer"></div>
     <div id="results-banner" style="color: var(--accent-amber); font-size: 16px; font-weight: 600; margin: 10px 0;"></div>
 
-    <!-- Step 1: Join / Edit Name Card -->
+    <!-- Join/Name Setup -->
     <div id="join-sec" class="card">
       <h3 style="margin-top: 0;">👤 Your Player Profile</h3>
       <input type="text" id="username" placeholder="Enter Your Nickname">
       <button id="save-name-btn" onclick="saveName()">Save / Update Name</button>
     </div>
 
-    <!-- Host Admin Settings -->
+    <!-- Host Admin Panel -->
     <div id="host-sec" class="card hidden">
       <h3 style="margin-top: 0; color: var(--accent-amber);">⚙️ Admin Panel</h3>
       <div style="text-align: left; font-size: 14px;">
@@ -223,7 +179,7 @@
       <button class="btn-green" onclick="startGame()">🚀 Start Game for Everyone</button>
     </div>
 
-    <!-- Game Active Section -->
+    <!-- Active Game Panel -->
     <div id="game-sec" class="card hidden">
       <p style="margin: 0 0 5px 0; font-size: 13px; color: #94a3b8;">YOUR ASSIGNED ROLE</p>
       <div id="my-role" class="role-badge">???</div>
@@ -239,13 +195,13 @@
       <div id="host-restart-area" class="hidden" style="margin-top: 15px;"></div>
     </div>
 
-    <!-- Day Voting Breakdown Window -->
+    <!-- Voting Tally Display -->
     <div id="voting-summary-sec" class="card hidden" style="border: 1px solid var(--accent-amber);">
       <h3 style="color: var(--accent-amber); margin-top: 0;">📊 Voting Results Tally</h3>
       <div id="vote-breakdown-list"></div>
     </div>
 
-    <!-- Active Roster Card -->
+    <!-- Roster Display -->
     <div class="card">
       <h3 style="margin-top: 0; font-size: 16px;">👥 Live Players</h3>
       <div id="player-list" class="player-grid"></div>
@@ -261,7 +217,6 @@
     let allPlayers = [];
     let currentPhase = 'LOBBY';
     let audioCtx = null;
-    let isAudioUnlocked = false;
 
     let playerToken = localStorage.getItem('mafia_token');
     if (!playerToken) {
@@ -275,7 +230,7 @@
       socket.emit('joinGame', { name: savedName, token: playerToken });
     }
 
-    // Attach global listener so ANY tap on screen unlocks iOS audio context
+    // Silent unlocking for mobile browser audio policy
     document.body.addEventListener('touchstart', unlockAudio, { once: false });
     document.body.addEventListener('click', unlockAudio, { once: false });
 
@@ -288,79 +243,59 @@
         audioCtx.resume();
       }
       
-      // Warm up HTML5 audio tags
-      ['audio-mafia', 'audio-role', 'audio-wakeup'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.play().then(() => {
-            el.pause();
-            el.currentTime = 0;
-          }).catch(e => {});
-        }
-      });
+      const el = document.getElementById('audio-wakeup');
+      if (el) {
+        el.play().then(() => {
+          el.pause();
+          el.currentTime = 0;
+        }).catch(e => {});
+      }
 
-      isAudioUnlocked = true;
-      document.getElementById('audio-status').innerText = '🔊 Audio Enabled';
+      document.getElementById('audio-status').innerText = '🔊 Wakeup Cue Ready';
       document.getElementById('audio-status').style.color = 'var(--accent-green)';
     }
 
-    function playAudioTone(freq, duration = 0.4) {
+    // Single function reserved EXCLUSIVELY for morning wakeup cue
+    function playWakeupCue() {
       unlockAudio();
-
-      // Primary: Web Audio API Oscillator
       try {
         if (audioCtx && audioCtx.state === 'running') {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
-
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(1174.66, audioCtx.currentTime + 0.4);
 
           gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
 
           osc.connect(gain);
           gain.connect(audioCtx.destination);
 
           osc.start();
-          osc.stop(audioCtx.currentTime + duration);
+          osc.stop(audioCtx.currentTime + 0.5);
           return;
         }
-      } catch (e) {
-        console.log("Web Audio error, trying fallback:", e);
-      }
+      } catch (e) {}
 
-      // Fallback: HTML5 Audio Elements
-      let audioId = 'audio-role';
-      if (freq <= 500) audioId = 'audio-mafia';
-      if (freq >= 800) audioId = 'audio-wakeup';
-
-      const audioEl = document.getElementById(audioId);
+      const audioEl = document.getElementById('audio-wakeup');
       if (audioEl) {
         audioEl.currentTime = 0;
-        audioEl.play().catch(e => console.log("Audio play blocked:", e));
+        audioEl.play().catch(e => {});
       }
     }
 
     function testAudioCue() {
-      unlockAudio();
-      playAudioTone(587.33, 0.4);
+      playWakeupCue();
       if ("vibrate" in navigator) {
         try { navigator.vibrate([100, 50, 100]); } catch(e){}
       }
     }
 
+    // Strictly trigger visual and audio wake-up ONLY when night ends
     socket.on('triggerAlert', (data) => {
-      if (data.type === 'MAFIA_TONE') {
-        playAudioTone(440, 0.5);
-        if ("vibrate" in navigator) try { navigator.vibrate(400); } catch(e){}
-      } else if (data.type === 'OTHER_ROLE_TONE') {
-        playAudioTone(587.33, 0.5);
-        if ("vibrate" in navigator) try { navigator.vibrate(400); } catch(e){}
-      } else if (data.type === 'CITY_WAKEUP') {
-        playAudioTone(880, 0.3);
-        setTimeout(() => playAudioTone(1174.66, 0.5), 350);
-        
+      if (data.type === 'CITY_WAKEUP') {
+        playWakeupCue();
         if ("vibrate" in navigator) try { navigator.vibrate([600, 200, 600]); } catch(e){}
         
         document.body.classList.add('flash-screen');
@@ -383,7 +318,6 @@
 
     socket.on('initPlayer', (data) => {
       isHost = data.isHost;
-
       if (isHost) {
         document.getElementById('host-badge').innerText = '👑 You are the Room Host';
         if (currentPhase === 'LOBBY') {
