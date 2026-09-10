@@ -10,7 +10,7 @@ app.use(express.static('public'));
 
 let game = {
   hostId: null,
-  players: [], // { id, name, role, isAlive, readyForNight }
+  players: [],
   phase: 'LOBBY',
   currentRound: 0,
   maxRounds: 3,
@@ -72,7 +72,6 @@ function processDayVotingResults() {
   io.emit('updatePlayers', game.players);
   io.emit('nightResults', [voteMsg]);
 
-  // Proceed to City Sleep after voting
   setTimeout(() => startNightPhase(), 4000);
 }
 
@@ -80,7 +79,6 @@ function processNightResults() {
   let announcements = [];
   const { mafiaTarget, doctorTarget, bomberTarget } = game.nightActions;
 
-  // Mafia & Doctor
   if (mafiaTarget) {
     if (mafiaTarget === doctorTarget) {
       announcements.push("The person targeted by the Mafia was SAVED by the Doctor!");
@@ -95,7 +93,6 @@ function processNightResults() {
     announcements.push("Mafia did not strike tonight.");
   }
 
-  // Suicide Bomber
   if (bomberTarget && bomberTarget !== 'NONE') {
     const bomber = game.players.find(p => p.role === 'Suicide Bomber');
     const bombVictim = game.players.find(p => p.id === bomberTarget);
@@ -146,14 +143,18 @@ function startRound() {
 }
 
 io.on('connection', (socket) => {
-  if (!game.hostId) {
+  // If no active players exist, assign this new socket as Host immediately
+  if (game.players.length === 0 || !game.hostId) {
     game.hostId = socket.id;
   }
 
   socket.on('joinGame', ({ name }) => {
-    if (!game.players.find(p => p.id === socket.id)) {
+    let existing = game.players.find(p => p.id === socket.id);
+    if (!existing) {
       game.players.push({ id: socket.id, name, role: null, isAlive: true, readyForNight: false });
     }
+
+    // Force check host status
     const isHost = socket.id === game.hostId;
     socket.emit('initPlayer', { isHost });
     io.emit('updatePlayers', game.players);
@@ -224,9 +225,13 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     game.players = game.players.filter(p => p.id !== socket.id);
-    if (socket.id === game.hostId && game.players.length > 0) {
-      game.hostId = game.players[0].id;
-      io.to(game.hostId).emit('initPlayer', { isHost: true });
+    if (socket.id === game.hostId) {
+      if (game.players.length > 0) {
+        game.hostId = game.players[0].id;
+        io.to(game.hostId).emit('initPlayer', { isHost: true });
+      } else {
+        game.hostId = null;
+      }
     }
     io.emit('updatePlayers', game.players);
   });
