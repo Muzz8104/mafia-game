@@ -28,7 +28,7 @@ function shuffle(array) {
 }
 
 function startTimer(seconds, onComplete) {
-  clearInterval(timerInterval);
+  stopTimer();
   game.timer = seconds;
   io.emit('timerUpdate', game.timer);
 
@@ -36,14 +36,17 @@ function startTimer(seconds, onComplete) {
     game.timer--;
     io.emit('timerUpdate', game.timer);
     if (game.timer <= 0) {
-      clearInterval(timerInterval);
+      stopTimer();
       onComplete();
     }
   }, 1000);
 }
 
 function stopTimer() {
-  clearInterval(timerInterval);
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
   game.timer = 0;
   io.emit('timerUpdate', 0);
 }
@@ -123,9 +126,9 @@ function processDayVotingResults() {
 
   if (checkWinConditions()) {
     const msg = game.winner === 'COMMON_MAN' ? "🎉 Common Men Win! All Mafias Eliminated!" : "🗡️ Mafias Win! They took over the town!";
-    setTimeout(() => endGame(msg), 5000);
+    setTimeout(() => endGame(msg), 4000);
   } else {
-    setTimeout(() => startNightPhase(), 6000);
+    setTimeout(() => startNightPhase(), 5000);
   }
 }
 
@@ -163,6 +166,7 @@ function processNightResults() {
 
   game.nightActions = { mafiaTarget: null, doctorTarget: null, bomberTarget: null };
 
+  // Trigger wake-up vibration for everyone
   io.emit('vibrateEveryone');
   io.emit('updatePlayers', game.players);
   io.emit('nightResults', announcements);
@@ -195,11 +199,13 @@ function runNightStep(step) {
 
   io.emit('nightStepChange', { subPhase: step });
 
+  // Vibrate target role's phone
   activePlayers.forEach(p => {
     io.to(p.id).emit('vibrateRole');
   });
 
-  startTimer(15, () => advanceNightSequence(step));
+  // 2 Minutes (120 seconds) for night actions
+  startTimer(120, () => advanceNightSequence(step));
 }
 
 function advanceNightSequence(currentStep) {
@@ -222,7 +228,8 @@ function startRound() {
   if (game.currentRound >= 2) {
     game.phase = 'DAY_VOTING';
     io.emit('phaseChange', { phase: 'DAY_VOTING', round: game.currentRound, maxRounds: game.maxRounds });
-    startTimer(30, () => processDayVotingResults());
+    // 2 Minutes (120 seconds) for Day Voting
+    startTimer(120, () => processDayVotingResults());
   } else {
     game.phase = 'DISCUSSION';
     io.emit('phaseChange', { phase: 'DISCUSSION', round: game.currentRound, maxRounds: game.maxRounds });
@@ -319,6 +326,7 @@ io.on('connection', (socket) => {
     game.phase = 'LOBBY';
     game.currentRound = 0;
     game.winner = null;
+    game.nightSubPhase = null;
     game.nightActions = { mafiaTarget: null, doctorTarget: null, bomberTarget: null };
     game.votes = {};
 
@@ -367,6 +375,7 @@ io.on('connection', (socket) => {
       if (target) {
         player.policeUsed = true;
         socket.emit('policeResult', { targetName: target.name, role: target.role });
+        advanceNightSequence('POLICE');
       }
     }
   });
@@ -377,12 +386,13 @@ io.on('connection', (socket) => {
 
     if (player.role === 'Mafia' && game.nightSubPhase === 'MAFIA') {
       game.nightActions.mafiaTarget = targetId;
-    }
-    if (player.role === 'Doctor' && game.nightSubPhase === 'DOCTOR') {
+      advanceNightSequence('MAFIA');
+    } else if (player.role === 'Doctor' && game.nightSubPhase === 'DOCTOR') {
       game.nightActions.doctorTarget = targetId;
-    }
-    if (player.role === 'Suicide Bomber' && game.nightSubPhase === 'BOMBER') {
+      advanceNightSequence('DOCTOR');
+    } else if (player.role === 'Suicide Bomber' && game.nightSubPhase === 'BOMBER') {
       game.nightActions.bomberTarget = targetId;
+      advanceNightSequence('BOMBER');
     }
   });
 
