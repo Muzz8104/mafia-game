@@ -31,7 +31,6 @@
 
     .container { max-width: 500px; margin: 0 auto; }
 
-    /* Header & Branding */
     .game-logo {
       font-size: 32px;
       font-weight: 700;
@@ -47,7 +46,6 @@
       100% { transform: scale(1.03); }
     }
 
-    /* Card Styling */
     .card {
       background: var(--card-bg);
       padding: 18px;
@@ -63,7 +61,6 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* Form Controls & Inputs */
     input, select {
       width: 100%;
       padding: 12px;
@@ -81,7 +78,6 @@
       box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
     }
 
-    /* Buttons */
     button {
       width: 100%;
       padding: 14px;
@@ -104,9 +100,7 @@
       background: linear-gradient(135deg, #10b981, #059669);
       box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
     }
-    .btn-green:hover { box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5); }
 
-    /* Timer */
     #timer {
       font-size: 36px;
       font-weight: 700;
@@ -115,7 +109,6 @@
       letter-spacing: 1px;
     }
 
-    /* Badges & Role Box */
     .role-badge {
       display: inline-block;
       padding: 6px 16px;
@@ -128,16 +121,9 @@
       box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
     }
 
-    /* Dynamic Phase Themes */
-    body.night-mode {
-      background: #020617;
-    }
-    body.night-mode .card {
-      background: #0f172a;
-      border-color: #1e293b;
-    }
+    body.night-mode { background: #020617; }
+    body.night-mode .card { background: #0f172a; border-color: #1e293b; }
 
-    /* Voting Breakdown List */
     .tally-item {
       background: #0f172a;
       padding: 10px 14px;
@@ -150,7 +136,6 @@
       border-left: 4px solid var(--accent-amber);
     }
 
-    /* Player Roster UI */
     .player-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -239,7 +224,6 @@
     let policeUsed = false;
     let allPlayers = [];
 
-    // Persist login token
     let playerToken = localStorage.getItem('mafia_token');
     if (!playerToken) {
       playerToken = 'token_' + Math.random().toString(36).substr(2, 9);
@@ -324,10 +308,30 @@
       } else if (data.phase === 'CITY_SLEEP') {
         document.body.classList.add('night-mode');
         document.getElementById('phase-title').innerText = '🌙 City Sleep Phase';
-        renderNightActionControls();
       } else if (data.phase === 'GAME_OVER') {
         document.body.classList.remove('night-mode');
         document.getElementById('phase-title').innerText = data.winnerMessage || '🏆 GAME OVER!';
+      }
+    });
+
+    // Sequential Night Steps Execution
+    socket.on('nightStepChange', (data) => {
+      document.body.classList.add('night-mode');
+      document.getElementById('phase-title').innerText = '🌙 City Sleep Phase';
+      renderNightStepAction(data.subPhase);
+    });
+
+    // Role-specific phone vibration
+    socket.on('vibrateRole', () => {
+      if ("vibrate" in navigator) {
+        navigator.vibrate([600, 200, 600]);
+      }
+    });
+
+    // Universal wake-up phone vibration
+    socket.on('vibrateEveryone', () => {
+      if ("vibrate" in navigator) {
+        navigator.vibrate([400, 150, 400, 150, 400]);
       }
     });
 
@@ -376,34 +380,48 @@
       document.getElementById('results-banner').innerHTML = data.verdict;
     });
 
-    socket.on('vibrateRoleActions', () => {
-      if (['Mafia', 'Doctor', 'Police', 'Suicide Bomber'].includes(myRole) && "vibrate" in navigator) {
-        navigator.vibrate([500, 200, 500]);
-      }
-    });
-
-    function renderNightActionControls() {
+    function renderNightStepAction(subPhase) {
       const area = document.getElementById('action-area');
       const activeTargets = allPlayers.filter(p => p.isAlive && p.id !== socket.id);
+      const isMeAlive = allPlayers.some(p => p.id === socket.id && p.isAlive);
 
-      if (myRole === 'Mafia') {
-        area.innerHTML = `<h3>🗡️ Mafia Action</h3><p style="font-size:14px; color:#94a3b8;">Select victim to eliminate:</p>` + 
-          buildSelectHtml(activeTargets, 'night-target', false) + `<button onclick="submitAction()">Confirm Elimination</button>`;
-      } else if (myRole === 'Doctor') {
-        area.innerHTML = `<h3>💉 Doctor Action</h3><p style="font-size:14px; color:#94a3b8;">Select player to save tonight:</p>` + 
-          buildSelectHtml(allPlayers.filter(p => p.isAlive), 'night-target', false) + `<button onclick="submitAction()">Confirm Protection</button>`;
-      } else if (myRole === 'Police') {
-        if (!policeUsed) {
-          area.innerHTML = `<h3>🔍 Police Investigation</h3><p style="font-size:14px; color:#94a3b8;">Select target to investigate:</p>` + 
-            buildSelectHtml(activeTargets, 'police-target', false) + `<button onclick="submitPolice()">Investigate Target</button>`;
+      if (!isMeAlive) {
+        area.innerHTML = `<p style="color:#94a3b8;">👻 You are eliminated. Spectating...</p>`;
+        return;
+      }
+
+      if (subPhase === 'MAFIA') {
+        if (myRole === 'Mafia') {
+          area.innerHTML = `<h3>🗡️ Step 1: Mafia Action</h3><p style="font-size:14px; color:#94a3b8;">Select victim to eliminate:</p>` + 
+            buildSelectHtml(activeTargets, 'night-target', false) + `<button onclick="submitAction()">Confirm Target</button>`;
         } else {
-          area.innerHTML = `<p style="color:#94a3b8;">🚔 You have already used your investigation ability!</p>`;
+          area.innerHTML = `<p style="color:#94a3b8;">😴 Keep your eyes closed. Mafia is taking their turn...</p>`;
         }
-      } else if (myRole === 'Suicide Bomber') {
-        area.innerHTML = `<h3>💣 Suicide Bomber</h3><p style="font-size:14px; color:#94a3b8;">Choose target to explode with:</p>` + 
-          buildSelectHtml(activeTargets, 'night-target', true) + `<button onclick="submitAction()">Confirm Target</button>`;
-      } else {
-        area.innerHTML = `<p style="color:#94a3b8;">😴 You are a Common Man. Sleep peacefully...</p>`;
+      } else if (subPhase === 'DOCTOR') {
+        if (myRole === 'Doctor') {
+          area.innerHTML = `<h3>💉 Step 2: Doctor Action</h3><p style="font-size:14px; color:#94a3b8;">Select player to save tonight:</p>` + 
+            buildSelectHtml(allPlayers.filter(p => p.isAlive), 'night-target', false) + `<button onclick="submitAction()">Confirm Protection</button>`;
+        } else {
+          area.innerHTML = `<p style="color:#94a3b8;">😴 Keep your eyes closed. Doctor is taking their turn...</p>`;
+        }
+      } else if (subPhase === 'POLICE') {
+        if (myRole === 'Police') {
+          if (!policeUsed) {
+            area.innerHTML = `<h3>🔍 Step 3: Police Action</h3><p style="font-size:14px; color:#94a3b8;">Select target to investigate:</p>` + 
+              buildSelectHtml(activeTargets, 'police-target', false) + `<button onclick="submitPolice()">Investigate Target</button>`;
+          } else {
+            area.innerHTML = `<p style="color:#94a3b8;">🚔 You have already used your investigation ability!</p>`;
+          }
+        } else {
+          area.innerHTML = `<p style="color:#94a3b8;">😴 Keep your eyes closed. Police is taking their turn...</p>`;
+        }
+      } else if (subPhase === 'BOMBER') {
+        if (myRole === 'Suicide Bomber') {
+          area.innerHTML = `<h3>💣 Step 4: Suicide Bomber</h3><p style="font-size:14px; color:#94a3b8;">Choose target to explode with:</p>` + 
+            buildSelectHtml(activeTargets, 'night-target', true) + `<button onclick="submitAction()">Confirm Target</button>`;
+        } else {
+          area.innerHTML = `<p style="color:#94a3b8;">😴 Keep your eyes closed. Suicide Bomber is taking their turn...</p>`;
+        }
       }
     }
 
