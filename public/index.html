@@ -29,6 +29,17 @@
       min-height: 100vh;
     }
 
+    /* Flash screen visual effect for devices without vibration support (e.g. iOS) */
+    body.flash-screen {
+      animation: flashBg 0.5s iteration-count 3;
+    }
+
+    @keyframes flashBg {
+      0% { background: #0f172a; }
+      50% { background: #ef4444; }
+      100% { background: #0f172a; }
+    }
+
     .container { max-width: 500px; margin: 0 auto; }
 
     .game-logo {
@@ -172,6 +183,12 @@
     <div id="timer"></div>
     <div id="results-banner" style="color: var(--accent-amber); font-size: 16px; font-weight: 600; margin: 10px 0;"></div>
 
+    <!-- Vibration Enable / Test Bar -->
+    <div id="vibe-unlock-card" class="card" style="border: 1px solid var(--accent-amber);">
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: var(--accent-amber);">📲 <strong>Enable Haptic Feedback</strong></p>
+      <button class="btn-blue" onclick="enableAndTestVibration()">🔔 Tap Here to Enable Vibration</button>
+    </div>
+
     <!-- Step 1: Join / Edit Name Card -->
     <div id="join-sec" class="card">
       <h3 style="margin-top: 0;">👤 Your Player Profile</h3>
@@ -255,15 +272,34 @@
       }
     }
 
-    // Helper for device vibration with fallback
+    // Unlocks mobile browser vibration policy on explicit tap
+    function enableAndTestVibration() {
+      if ("vibrate" in navigator) {
+        navigator.vibrate([200, 100, 200]);
+        alert("Vibration tested! Your device is ready.");
+        document.getElementById('vibe-unlock-card').classList.add('hidden');
+      } else {
+        alert("Hardware vibration is not supported by this browser (e.g., iOS Safari). Flash alerts will be used instead!");
+        document.getElementById('vibe-unlock-card').classList.add('hidden');
+      }
+    }
+
+    // Improved vibration helper with screen flash fallback
     function triggerDeviceVibration(pattern) {
+      let vibrated = false;
       if ("vibrate" in navigator) {
         try {
-          navigator.vibrate(pattern);
+          vibrated = navigator.vibrate(pattern);
         } catch (e) {
-          console.log("Vibration error or blocked by browser policy:", e);
+          console.log("Vibration error:", e);
         }
       }
+
+      // Visual flash fallback for iPhones/Unsupported devices
+      document.body.classList.add('flash-screen');
+      setTimeout(() => {
+        document.body.classList.remove('flash-screen');
+      }, 1500);
     }
 
     socket.on('initPlayer', (data) => {
@@ -373,14 +409,14 @@
       renderNightStepAction(data.subPhase);
     });
 
-    // Role-specific wake-up vibration (Strong triple vibration)
+    // Role-specific wake-up vibration
     socket.on('vibrateRole', () => {
-      triggerDeviceVibration([800, 300, 800, 300, 800]);
+      triggerDeviceVibration([500, 200, 500, 200, 500]);
     });
 
-    // Morning wake-up vibration for everyone (Long distinct vibration pattern)
+    // Morning wake-up vibration for everyone
     socket.on('vibrateEveryone', () => {
-      triggerDeviceVibration([1000, 200, 1000, 200, 1000]);
+      triggerDeviceVibration([1000, 300, 1000, 300, 1000]);
     });
 
     function clickProceed() {
